@@ -1,2 +1,2 @@
 # bacaci-trader
-Algorithmic Backtesting and Trading for Python
+Algorithmic Backtesting and Trading in Binance API for Python
