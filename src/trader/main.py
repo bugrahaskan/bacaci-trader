@@ -5,19 +5,11 @@ import configparser
 #import os
 import time
 
-<<<<<<< HEAD
 from bacaci.threads import DataThread, TradeThread
 from bacaci.memory import Memory
 from bacaci.backtest import Backtest
 from bacaci.data import Data
 from bacaci.enums import Parameters
-=======
-from .bacaci.threads import DataThread, TradeThread
-from .bacaci.memory import Memory
-from .bacaci.backtest import Backtest
-from .bacaci.data import Data
-from .bacaci.enums import Parameters
->>>>>>> 1cd8e060cce6193b5e7eaa0e4b651f4b31a8ec36
 
 def data_retrieving_process(api, symbol, arg):
 
