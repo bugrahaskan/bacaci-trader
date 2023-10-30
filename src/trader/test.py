@@ -58,6 +58,22 @@ def read_data():
     return rsi
 
 df = read_data()
-print(df)
+#print(df)
 
-Memory.normalize_data()
+print(Memory.normalize_data_old(df[0]["volume"], name="volume"))
+print(Memory.normalize_data(df[0]['volume'].values))
+
+test = pd.DataFrame(
+    Memory.normalize_data(df[0]['volume'].values)
+)
+print(test)
+
+last_keys_1m = [
+    -i for i in range(1,10)
+]
+print(last_keys_1m)
+
+from bacaci.notification import Notification
+
+mail = Notification()
+mail("davarchelebi@gmail.com", "test")

@@ -122,8 +122,8 @@ class Memory:
             
             normalized_data = [
                 #Memory.normalize_data(rsi[0]["volume"], name="volume"),
-                Memory.normalize_data_old(rsi[0]["volume"], name="volume"),
-                Memory.normalize_data_old(rsi[1]["volume"], name="volume")
+                pd.DataFrame(Memory.normalize_data(rsi[0]["volume"].values)),
+                pd.DataFrame(Memory.normalize_data(rsi[1]["volume"].values))
             ]
 
             scaled_data = [
