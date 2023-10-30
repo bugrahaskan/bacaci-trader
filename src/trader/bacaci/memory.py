@@ -79,20 +79,21 @@ class Memory:
                 }
             }
 
-            intervals = ['1s', '1m', '5m']
+            #intervals = ['1s', '1m', '5m']
+            intervals = ['1m', '5m']
 
             rows = [
+                #self.database.fetch_rows(
+                #    Data.table_name(self.SYMBOL, intervals[0], self.API),
+                #    limit=6000
+                #    #limit=1000
+                #),
                 self.database.fetch_rows(
                     Data.table_name(self.SYMBOL, intervals[0], self.API),
-                    limit=6000
-                    #limit=1000
-                ),
-                self.database.fetch_rows(
-                    Data.table_name(self.SYMBOL, intervals[1], self.API),
                     limit=100
                 ),
                 self.database.fetch_rows(
-                    Data.table_name(self.SYMBOL, intervals[2], self.API),
+                    Data.table_name(self.SYMBOL, intervals[1], self.API),
                     limit=100
                 )
             ]
@@ -109,26 +110,26 @@ class Memory:
             #dfs[0] = dfs[0].loc[ dfs[0]['timestamp'] % 10 == (self.CURRENT_TIMESTAMP % 10) ] # son 10 saniyelerin verileri
 
             # each 10 sec back to 60 sec:
-            selected_df_10s = dfs[0][ dfs[0]['timestamp'] % 10 == (self.CURRENT_TIMESTAMP%10) ]
-            selected_df_back_10s = selected_df_10s.loc[ selected_df_10s['timestamp'] % 12 == (self.CURRENT_TIMESTAMP%12) ]
+            #selected_df_10s = dfs[0][ dfs[0]['timestamp'] % 10 == (self.CURRENT_TIMESTAMP%10) ]
+            #selected_df_back_10s = selected_df_10s.loc[ selected_df_10s['timestamp'] % 12 == (self.CURRENT_TIMESTAMP%12) ]
 
             rsi = [
                 #RSI(dfs[0], periods=14*6, ema=True),
-                RSI(selected_df_back_10s, ema=True),
-                RSI(dfs[1], ema=True),
-                RSI(dfs[2], ema=True)
+                #RSI(selected_df_back_10s, ema=True),
+                RSI(dfs[0], ema=True),
+                RSI(dfs[1], ema=True)
             ]
             
             normalized_data = [
-                Memory.normalize_data(rsi[0]["volume"], name="volume"),
-                Memory.normalize_data(rsi[1]["volume"], name="volume"),
-                Memory.normalize_data(rsi[2]["volume"], name="volume")
+                #Memory.normalize_data(rsi[0]["volume"], name="volume"),
+                Memory.normalize_data_old(rsi[0]["volume"], name="volume"),
+                Memory.normalize_data_old(rsi[1]["volume"], name="volume")
             ]
 
             scaled_data = [
+                #Memory.scale_data(rsi[0]["volume"], name="volume"),
                 Memory.scale_data(rsi[0]["volume"], name="volume"),
-                Memory.scale_data(rsi[1]["volume"], name="volume"),
-                Memory.scale_data(rsi[2]["volume"], name="volume")
+                Memory.scale_data(rsi[1]["volume"], name="volume")
             ]
 
             data = []
@@ -140,7 +141,7 @@ class Memory:
             self.memory["current_date"] = int(time.time())
 
             # add 1s.
-            for i, row in data[0].iterrows():
+            '''for i, row in data[0].iterrows():
                 #if row[0] % 10 == 0: # remove if necessary
                 self.memory["historical_prices"]["1s"][row.iloc[0]] = {
                     "t": row.iloc[0],
@@ -156,9 +157,9 @@ class Memory:
                     "normalized_volume": row.iloc[8]
                     #"scaled_volume": row.iloc[9]
                 }
-            print("fetched 1s data")
+            print("fetched 1s data")'''
 
-            for i, row in data[1].iterrows():
+            for i, row in data[0].iterrows():
                 self.memory["historical_prices"]["1m"][row.iloc[0]] = {
                     "t": row.iloc[0],
                     "o": row.iloc[2],
@@ -175,7 +176,7 @@ class Memory:
                 }
             print("fetched 1m data")
 
-            for i, row in data[2].iterrows():
+            for i, row in data[1].iterrows():
                 self.memory["historical_prices"]["5m"][row.iloc[0]] = {
                     "t": row.iloc[0],
                     "o": row.iloc[2],
