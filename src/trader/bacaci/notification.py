@@ -47,9 +47,3 @@ class Notification:
 
         # Close the connection
         self.server.quit()
-
-        
-
-
-        
-        message = "This is a test email sent from Python."

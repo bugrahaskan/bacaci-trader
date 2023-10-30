@@ -40,7 +40,8 @@ class Data:
                 self.params = [
                     Data.set_params(self.SYMBOL, Parameters.BINANCE_INTERVAL_1s.value),
                     Data.set_params(self.SYMBOL, Parameters.BINANCE_INTERVAL_1m.value),
-                    Data.set_params(self.SYMBOL, Parameters.BINANCE_INTERVAL_5m.value)
+                    Data.set_params(self.SYMBOL, Parameters.BINANCE_INTERVAL_5m.value),
+                    Data.set_params(self.SYMBOL, Parameters.BINANCE_INTERVAL_15m.value)
                 ]
                 
                 for param in self.params:

@@ -3,9 +3,10 @@ import json
 import time
 import pandas as pd
 
-from .wallet import Wallet
+from .wallet import Wallet, StopLoss
 from ..enums import Parameters
 from ..data import Data
+from ..notification import Notification
 
 class Strategy:
 
@@ -24,6 +25,12 @@ class Strategy:
         
         print("Strategy created")
         time.sleep(1)
+
+        #try:
+        #    mail = Notification()
+        #    print("Succesfully connected to SMTP")
+        #except:
+        #    print("SMTP problem occurred, continue...")
 
         # process according to strategy
         loop = asyncio.new_event_loop()
@@ -970,7 +977,8 @@ class Strategy:
                     self.check_conditions(
                         cond=all(
                             [
-                                not abs(data["historical_prices"]["1m"][last_key_1m]["rsi"] - 70.) < 4.,
+                                #not abs(data["historical_prices"]["1m"][last_key_1m]["rsi"] - 70.) < 4.,
+                                not data["historical_prices"]["1m"][last_key_1m]["rsi"] > (70 - 4.),
                                 data["historical_prices"]["1m"][last_key_1m]["normalized_volume"] <= 0.,
                                 #abs(data["historical_prices"]["5m"][last_key_5m]["rsi"] - 70.) < 3.,
                                 data["historical_prices"]["5m"][last_key_5m]["rsi"] > (70 - 3.)
@@ -981,7 +989,8 @@ class Strategy:
                     self.check_conditions(
                         cond=all(
                             [
-                                not abs(data["historical_prices"]["1m"][last_key_1m]["rsi"] - 30.) < 4.,
+                                #not abs(data["historical_prices"]["1m"][last_key_1m]["rsi"] - 30.) < 4.,
+                                not data["historical_prices"]["1m"][last_key_1m]["rsi"] < (30 + 4.),
                                 data["historical_prices"]["1m"][last_key_1m]["normalized_volume"] <= 0.,
                                 #abs(data["historical_prices"]["5m"][last_key_5m]["rsi"] - 30.) < 3.,
                                 data["historical_prices"]["5m"][last_key_5m]["rsi"] < (30 + 3.)
@@ -1004,6 +1013,9 @@ class Strategy:
                         price=data["historical_prices"]["1m"][last_key_1m]["c"],
                         date=data["historical_prices"]["1m"][last_key_1m]["t"]
                     )
+
+                    stop_loss = StopLoss(max(data["historical_prices"]["1m"][last_key_1m]["o"], data["historical_prices"]["1m"][last_key_1m]["c"]) + 5.)
+
                     print(self.wallet.orders)
 
                 if resp2:
@@ -1019,6 +1031,9 @@ class Strategy:
                         price=data["historical_prices"]["1m"][last_key_1m]["c"],
                         date=data["historical_prices"]["1m"][last_key_1m]["t"]
                     )
+
+                    stop_loss = StopLoss(max(data["historical_prices"]["1m"][last_key_1m]["o"], data["historical_prices"]["1m"][last_key_1m]["c"]) - 5.)
+
                     print(self.wallet.orders)
 
             elif self.wallet.is_open():
@@ -1045,8 +1060,8 @@ class Strategy:
                         self.check_conditions(
                             cond=all(
                                 [
-                                    #self.wallet.stop_loss_2(data["historical_prices"]["5m"][last_key]["c"], 0.15),
-                                    data["historical_prices"]["5m"][last_key_5m]["c"] <= min( data["historical_prices"]["5m"][key]["l"] for key in last_keys_5m )
+                                    stop_loss.check_trigger(data["historical_prices"]["5m"][last_key_5m]["c"], Parameters.TYPE_LONG.value),
+                                    #data["historical_prices"]["5m"][last_key_5m]["c"] <= min( data["historical_prices"]["5m"][key]["l"] for key in last_keys_5m )
                                 ]
                             )
                         )
@@ -1095,8 +1110,8 @@ class Strategy:
                         self.check_conditions(
                             cond=all(
                                 [
-                                    #self.wallet.stop_loss_2(data["historical_prices"]["5m"][last_key]["c"], 0.15),
-                                    data["historical_prices"]["5m"][last_key_5m]["c"] >= max( data["historical_prices"]["5m"][key]["h"] for key in last_keys_5m )
+                                    stop_loss.check_trigger(data["historical_prices"]["5m"][last_key_5m]["c"], Parameters.TYPE_SHORT.value),
+                                    #data["historical_prices"]["5m"][last_key_5m]["c"] >= max( data["historical_prices"]["5m"][key]["h"] for key in last_keys_5m )
                                 ]
                             )
                         )
