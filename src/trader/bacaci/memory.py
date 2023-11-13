@@ -4,12 +4,13 @@ import asyncio
 import pandas as pd
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 import numpy as np
+from pandas_ta import rsi as RSI
 
 from .database import Database
 from .data import Data
 from .enums import Parameters
 #import indicators as ind
-from .indicators import rsi as RSI
+#from .indicators import rsi as RSI
 
 class Memory:
 
@@ -18,7 +19,6 @@ class Memory:
         self.API = api
         self.SYMBOL = symbol
         self.INTERVAL = "1m"
-        self.CURRENT_TIMESTAMP = int(time.time()) - 1
 
         self.database = Database(
             db_name=Parameters.DATABASE.value
@@ -26,6 +26,8 @@ class Memory:
         self.database.connect_db()
 
         self.table_name = Data.table_name(self.SYMBOL, self.INTERVAL, self.API)
+
+        self.lock = asyncio.Lock()
 
         # Create JSON
         '''self.memory = {
@@ -49,14 +51,16 @@ class Memory:
             }
         }'''
 
-        loop = asyncio.new_event_loop()
-        loop.run_until_complete(self.test())
+        #loop = asyncio.new_event_loop()
+        #loop.run_until_complete(self.mem())
 
-    async def test(self):
+    async def mem(self):
 
         # await asyncio.sleep(10) # wait before functioning
 
         while True:
+
+            self.CURRENT_TIMESTAMP = int(time.time())
 
             self.memory = {
                 "meta": {
@@ -79,8 +83,8 @@ class Memory:
                 }
             }
 
-            intervals = ['1s', '1m', '5m', '15m']
-            #intervals = ['1m', '5m']
+            #intervals = ['1s', '1m', '5m', '15m']
+            intervals = ['1s', '1m', '5m']
 
             rows = [
                 self.database.fetch_rows(
@@ -117,18 +121,63 @@ class Memory:
             selected_df_10s = dfs[0][ dfs[0]['timestamp'] % 10 == (self.CURRENT_TIMESTAMP%10) ]
             selected_df_back_10s = selected_df_10s.loc[ selected_df_10s['timestamp'] % 12 == (self.CURRENT_TIMESTAMP%12) ]
 
-            rsi = [
-                #RSI(dfs[0], periods=14*6, ema=True),
-                RSI(selected_df_back_10s, ema=True),
-                RSI(dfs[0], ema=True),
-                RSI(dfs[1], ema=True)
-            ]
+            # each 10 sec back to 60 sec:
+            selected_df_1m = dfs[0][ dfs[0]['timestamp'] % 10 == (self.CURRENT_TIMESTAMP%10) ]
+            selected_df_back_1m = selected_df_1m.loc[ selected_df_1m['timestamp'] % 60 == (self.CURRENT_TIMESTAMP%60) ]
+
+            # each 10 sec back to 5*60 sec:
+            selected_df_5m = dfs[0][ dfs[0]['timestamp'] % 10 == (self.CURRENT_TIMESTAMP%10) ]
+            selected_df_back_5m = selected_df_5m.loc[ selected_df_5m['timestamp'] % 300 == (self.CURRENT_TIMESTAMP%300) ]
+
+            # sum up volumes from 1s:
+            grouped_sums_1m = []; num_rows_1m = len(dfs[0]); num_groups_1m = num_rows_1m // 60
+            grouped_sums_5m = []; num_rows_5m = len(dfs[0]); num_groups_5m = num_rows_5m // 300
+
+            for i in range(num_groups_1m):
+                start = i * 60
+                end = start + 60
+                group = dfs[0]['volume'].iloc[start:end]
+                group_sum = group.sum()
+                grouped_sums_1m.append(group_sum)
+                #np.append(grouped_sums_1m, group_sum)
             
-            normalized_data = [
-                pd.DataFrame(Memory.normalize_data(rsi[0]["volume"].values)),
-                pd.DataFrame(Memory.normalize_data(rsi[1]["volume"].values)),
-                pd.DataFrame(Memory.normalize_data(rsi[2]["volume"].values))
+            for i in range(num_groups_5m):
+                start = i * 300
+                end = start + 300
+                group = dfs[0]['volume'].iloc[start:end]
+                group_sum = group.sum()
+                grouped_sums_5m.append(group_sum)
+                #np.append(grouped_sums_5m, group_sum)
+            
+            grouped_sums_1m_array = np.array(grouped_sums_1m)
+            grouped_sums_5m_array = np.array(grouped_sums_5m)
+
+            # real-time(intrabar) RSI with pandas_ta:
+            rsi = [
+                selected_df_10s.join(RSI(selected_df_10s['close'], length=14, sma=14)),
+                selected_df_back_1m.join(RSI(selected_df_back_1m['close'], length=14, sma=14)),
+                selected_df_back_5m.join(RSI(selected_df_back_5m['close'], length=14, sma=14))
             ]
+
+            # bar RSI with pandas_ta:
+            '''bar_rsi = [
+                selected_df_10s.join(RSI(selected_df_10s['close'], length=14, sma=14)),
+                dfs[1].join(RSI(dfs[1]['close'], length=14, sma=14)),
+                dfs[2].join(RSI(dfs[2]['close'], length=14, sma=14))
+            ]'''
+
+            rsi = [
+                r.reset_index(drop=True) for r in rsi
+            ]
+
+            normalized_data = [
+                pd.DataFrame(Memory.normalize_data(rsi[0]["volume"].iloc[-9:].values), columns=['normalized_volume']),
+                pd.DataFrame(Memory.normalize_data(grouped_sums_1m_array), columns=['normalized_volume']),
+                pd.DataFrame(Memory.normalize_data(grouped_sums_5m_array), columns=['normalized_volume'])
+            ]
+
+            # NOTICE:
+            # print(Memory.normalize_data(grouped_sums_1m_array))
 
             scaled_data = [
                 Memory.scale_data(rsi[0]["volume"], name="volume"),
@@ -136,10 +185,31 @@ class Memory:
                 Memory.scale_data(rsi[2]["volume"], name="volume")
             ]
 
+            minmaxed_data = [
+                pd.DataFrame(Memory.minmax_data(rsi[0]["volume"].iloc[-9:].values), columns=['minmax_volume']),
+                pd.DataFrame(Memory.minmax_data(grouped_sums_1m_array), columns=['minmax_volume']),
+                pd.DataFrame(Memory.minmax_data(grouped_sums_5m_array), columns=['minmax_volume'])
+            ]
+
             data = []
             for i in range(len(rsi)):
-                data.append(rsi[i].join(normalized_data[i]).join(scaled_data[i]))
-            
+                data.append(rsi[i].join(normalized_data[i]).join(scaled_data[i]).join(minmaxed_data[i]))
+
+            '''writer = pd.ExcelWriter("coef.xlsx")
+
+            test = pd.DataFrame(
+                {
+                    "date": data[1]["date"],
+                    "rsi": data[1]["RSI_14"],
+                    "minmax_volume": data[1]["minmax_volume"],
+                    "coef": np.abs(data[1]["RSI_14"] - 50) * data[1]["minmax_volume"]
+                }
+            )
+
+            test.to_excel(writer)
+            writer.close()
+            exit(0)'''
+
             # ekstremum modülü
             
             self.memory["current_date"] = int(time.time())
@@ -158,8 +228,10 @@ class Memory:
                     "rsi": row.iloc[7],
                     #"rsiUP": bool((normalized[0]['RSI_14'].iloc[i] - normalized[0]['RSI_14'].iloc[i-10]) > 0),
                     #"rsiUP": Memory.isRSIup_draft(normalized[0], row[0], 10),
-                    "normalized_volume": row.iloc[8]
-                    #"scaled_volume": row.iloc[9]
+                    "normalized_volume": row.iloc[8],
+                    "scaled_volume": row.iloc[9],
+                    "minmax_volume": row.iloc[10],
+                    "coef": abs(row.iloc[7] - 50) * row.iloc[8]
                 }
             print("fetched 1s data")
 
@@ -175,8 +247,10 @@ class Memory:
                     "rsi": row.iloc[7],
                     #"rsiUP": bool((normalized[0]['RSI_14'].iloc[i] - normalized[0]['RSI_14'].iloc[i-10]) > 0),
                     #"rsiUP": Memory.isRSIup_draft(normalized[0], row[0], 10),
-                    "normalized_volume": row.iloc[8]
-                    #"scaled_volume": row.iloc[9]
+                    "normalized_volume": row.iloc[8],
+                    "scaled_volume": row.iloc[9],
+                    "minmax_volume": row.iloc[10],
+                    "coef": abs(row.iloc[7] - 50) * row.iloc[8]
                 }
             print("fetched 1m data")
 
@@ -192,15 +266,19 @@ class Memory:
                     "rsi": row.iloc[7],
                     #"rsiUP": bool((normalized[1]['RSI_14'].iloc[i] - normalized[1]['RSI_14'].iloc[i-1]) > 0),
                     #"rsiUP": Memory.isRSIup_draft(normalized[1], row[0], 60),
-                    "normalized_volume": row.iloc[8]
-                    #"scaled_volume": row.iloc[9]
+                    "normalized_volume": row.iloc[8],
+                    "scaled_volume": row.iloc[9],
+                    "minmax_volume": row.iloc[10],
+                    "coef": abs(row.iloc[7] - 50) * row.iloc[8]
                 }
             print("fetched 5m data")
             # ...
 
-            with open(f"memory_{self.SYMBOL}.json", "w") as memory:
-                memory.write(json.dumps(self.memory))
-                print("Memory written to file")
+            async with self.lock:
+
+                with open(f"memory_{self.SYMBOL}.json", "w") as memory:
+                    memory.write(json.dumps(self.memory))
+                    print("Memory written to file")
 
             await asyncio.sleep(10)
 
@@ -280,6 +358,13 @@ class Memory:
     def normalize_data(data: np.array):
         # Create a StandardScaler
         scaler = StandardScaler()
+
+        return scaler.fit_transform(data.reshape(-1,1))
+    
+    @staticmethod
+    def minmax_data(data: np.array):
+        # Create a MinMax Scaler
+        scaler = MinMaxScaler()
 
         return scaler.fit_transform(data.reshape(-1,1))
     

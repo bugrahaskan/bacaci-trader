@@ -4,6 +4,7 @@ import time
 import configparser
 from datetime import datetime, timedelta
 import numpy as np
+from pandas_ta import rsi as RSI
 
 from .wallet.wallet import Wallet
 from .database import Database
@@ -11,7 +12,7 @@ from .data import Data
 from .enums import Parameters
 from .memory import Memory
 #import indicators as ind
-from .indicators import rsi as RSI, HeikinAshi
+#from .indicators import rsi as RSI, HeikinAshi
 
 from .wallet.wallet import TrailingStop, StopLoss, MyTrailingStop, TakeProfit
 
@@ -39,7 +40,7 @@ class Backtest:
         
         test_15min = 90 * 24 * 4 + 10
         test_5min = 1 * (90 * 24 * 12) + 10
-        test_1min = 90 * 24 * 60 + 10
+        test_1min = 3 * 24 * 60 + 10
 
         #df0 = pd.read_csv('NQZ2 Index-1min-t.csv')
         #df1 = pd.read_csv('NQZ2 Index-5min-t.csv')
@@ -90,7 +91,8 @@ class Backtest:
             ]
         
         rsi = [
-                RSI(df) for df in dfs
+                df.join(RSI(df['close'], length=14, sma=14)) for df in dfs
+                #RSI(df) for df in dfs
             ]
 
         # other check functions
@@ -1543,24 +1545,25 @@ class Backtest:
     def backtest_4_1min_5min_stabil_rsi(self, df):
 
         # find bars where RSI >= 70 for 1min data
-        filtered_70_df = df[0][ df[0]['RSI_14'] >= (70 - 3) ]
+        filtered_70_df = df[0][ df[0]['RSI_14'] >= (70 - 0) ]
         filtered_70_index = filtered_70_df.index.tolist()
 
         # find bars where RSI <= 30 for 1min data
-        filtered_30_df = df[0][ df[0]['RSI_14'] <= (30 + 3) ]
+        filtered_30_df = df[0][ df[0]['RSI_14'] <= (30 + 0) ]
         filtered_30_index = filtered_30_df.index.tolist()
 
         for i, row in df[0].iloc[9:-1].iterrows(): #check
 
             if not self.wallet.is_open():
 
-                if not row.name in filtered_70_index and Memory.normalize_data(df[0]['volume'].iloc[i-9:i+1].values)[-1][0] < 0: # and df[0]['volume'].iloc[i-9:i+1].sum() <= 10*2000:
+                if not row.name in filtered_70_index and Memory.normalize_data(df[0]['volume'].iloc[i-9:i+1].values)[-1][0] <= 0: # and df[0]['volume'].iloc[i-9:i+1].sum() <= 10*2000:
 
                     t = row['timestamp'] - Backtest.modulo_5_minutes(row['timestamp']) * 60 - 5 * 60
                     #t = datetime.strptime(row['date'], '%Y-%m-%d %H:%M:%S') - timedelta(minutes=Backtest.modulo_5_minutes(row['date'])) - timedelta(minutes=5)
                     #t = int(t.timestamp())
                     
-                    if abs(df[1]['RSI_14'].loc[ df[1]['timestamp'] == t ].values[0] - 70.) <= 3.:# and Memory.normalize_data(df[1]['volume'].loc[ df[1]['timestamp'] <= t ].iloc[i-9:i+1].values)[-1][0] < 0:
+                    #if abs(df[1]['RSI_14'].loc[ df[1]['timestamp'] == t ].values[0] - 70.) <= 4.:# and Memory.normalize_data(df[1]['volume'].loc[ df[1]['timestamp'] <= t ].iloc[i-9:i+1].values)[-1][0] < 0:
+                    if df[1]['RSI_14'].loc[ df[1]['timestamp'] == t ].values[0] > (70 - 4.):
                         print("Conditions satisfied, proceeding...")
 
                         self.wallet.open_position(
@@ -1577,13 +1580,14 @@ class Backtest:
 
                         print(self.wallet.orders)
 
-                elif not row.name in filtered_30_index and Memory.normalize_data(df[0]['volume'].iloc[i-9:i+1].values)[-1][0] < 0: # and df[0]['volume'].iloc[i-9:i+1].sum() <= 10*2000:
+                elif not row.name in filtered_30_index and Memory.normalize_data(df[0]['volume'].iloc[i-9:i+1].values)[-1][0] <= 0: # and df[0]['volume'].iloc[i-9:i+1].sum() <= 10*2000:
 
                     t = row['timestamp'] - Backtest.modulo_5_minutes(row['timestamp']) * 60 - 5 * 60
                     #t = datetime.strptime(row['date'], '%Y-%m-%d %H:%M:%S') - timedelta(minutes=Backtest.modulo_5_minutes(row['date'])) - timedelta(minutes=5)
                     #t = int(t.timestamp())
 
-                    if abs(df[1]['RSI_14'].loc[ df[1]['timestamp'] == t ].values[0] - 30.) <= 3.:# and Memory.normalize_data(df[1]['volume'].loc[ df[1]['timestamp'] <= t ].iloc[i-9:i+1].values)[-1][0] < 0:
+                    #if abs(df[1]['RSI_14'].loc[ df[1]['timestamp'] == t ].values[0] - 30.) <= 4.:# and Memory.normalize_data(df[1]['volume'].loc[ df[1]['timestamp'] <= t ].iloc[i-9:i+1].values)[-1][0] < 0:
+                    if df[1]['RSI_14'].loc[ df[1]['timestamp'] == t ].values[0] < (30 + 4.):
                         print("Conditions satisfied, proceeding...")
 
                         self.wallet.open_position(
@@ -1838,7 +1842,7 @@ class Backtest:
                 t = row['timestamp'] - Backtest.modulo_5_minutes(row['timestamp']) * 60 - 5 * 60
                 
                 #if abs(df[1]['RSI_14'].loc[ df[1]['timestamp'] == t ].values[0] - 70.) <= 3. and Memory.normalize_data(df[1]['volume'].loc[ df[1]['timestamp'] <= t ].iloc[i-9:i+1].values)[-1][0] > 0:
-                if df[1]['RSI_14'].loc[ df[1]['timestamp'] == t ].values[0] >= (70 - 3):# and Memory.normalize_data(df[1]['volume'].loc[ df[1]['timestamp'] <= t ].iloc[i-9:i+1].values)[-1][0] > 0:
+                if df[1]['RSI_14'].loc[ df[1]['timestamp'] == t ].values[0] >= (70 - 4):# and Memory.normalize_data(df[1]['volume'].loc[ df[1]['timestamp'] <= t ].iloc[i-9:i+1].values)[-1][0] > 0:
                     
                     # is 5min RSI up?
                     #if df[1]['RSI_14'].loc[ df[1]['timestamp'] <= t ].values[-1] - df[1]['RSI_14'].loc[ df[1]['timestamp'] <= t ].values[-3] > 0:
@@ -1869,7 +1873,7 @@ class Backtest:
                         print(self.wallet.orders)
 
                 #if abs(df[1]['RSI_14'].loc[ df[1]['timestamp'] == t ].values[0] - 30.) <= 3. and Memory.normalize_data(df[1]['volume'].loc[ df[1]['timestamp'] <= t ].iloc[i-9:i+1].values)[-1][0] > 0:
-                elif df[1]['RSI_14'].loc[ df[1]['timestamp'] == t ].values[0] <= (30 + 3):# and Memory.normalize_data(df[1]['volume'].loc[ df[1]['timestamp'] <= t ].iloc[i-9:i+1].values)[-1][0] > 0:
+                elif df[1]['RSI_14'].loc[ df[1]['timestamp'] == t ].values[0] <= (30 + 4):# and Memory.normalize_data(df[1]['volume'].loc[ df[1]['timestamp'] <= t ].iloc[i-9:i+1].values)[-1][0] > 0:
 
                     # is 5min RSI up?
                     #if df[1]['RSI_14'].loc[ df[1]['timestamp'] <= t ].values[-1] - df[1]['RSI_14'].loc[ df[1]['timestamp'] <= t ].values[-3] > 0:
@@ -1924,7 +1928,7 @@ class Backtest:
                         self.wallet.orders[self.wallet.INDEX]["NOT"] = "stop loss"
                         self.wallet.orders[self.wallet.INDEX]['Duration'] = str(int((datetime.strptime(df[0]['date'].iloc[i+1], '%Y-%m-%d %H:%M:%S') - datetime.strptime(self.wallet.orders[self.wallet.INDEX]['DateOpen'], '%Y-%m-%d %H:%M:%S')).total_seconds() / 60))+'min'
                     
-                    if take_profit.check_trigger(row['close'], Parameters.TYPE_SHORT.value):
+                    '''if take_profit.check_trigger(row['close'], Parameters.TYPE_SHORT.value):
 
                         self.wallet.close_position(
                             side="BUY",
@@ -1935,8 +1939,9 @@ class Backtest:
 
                         self.wallet.orders[self.wallet.INDEX]["NOT"] = "take profit"
                         self.wallet.orders[self.wallet.INDEX]['Duration'] = str(int((datetime.strptime(df[0]['date'].iloc[i+1], '%Y-%m-%d %H:%M:%S') - datetime.strptime(self.wallet.orders[self.wallet.INDEX]['DateOpen'], '%Y-%m-%d %H:%M:%S')).total_seconds() / 60))+'min'
-                    
-                    '''if self.wallet.orders[self.wallet.INDEX]["Open"] - 2. > row['close'] and trailing_stop.check_trigger(row['close'], Parameters.TYPE_SHORT.value):
+                    '''
+                    #if self.wallet.orders[self.wallet.INDEX]["Open"] - 2. > row['close'] and trailing_stop.check_trigger(row['close'], Parameters.TYPE_SHORT.value):
+                    if trailing_stop.check_trigger(row['close'], Parameters.TYPE_SHORT.value):
 
                         self.wallet.close_position(
                             side="BUY",
@@ -1947,7 +1952,7 @@ class Backtest:
 
                         self.wallet.orders[self.wallet.INDEX]["NOT"] = "trailing stop"
                         self.wallet.orders[self.wallet.INDEX]['Duration'] = str(int((datetime.strptime(df[0]['date'].iloc[i+1], '%Y-%m-%d %H:%M:%S') - datetime.strptime(self.wallet.orders[self.wallet.INDEX]['DateOpen'], '%Y-%m-%d %H:%M:%S')).total_seconds() / 60))+'min'
-                    '''
+                    
                 elif self.wallet.orders[self.wallet.INDEX]["Side"] == Parameters.TYPE_LONG.value:
 
                     trailing_stop.update_stop(row['close'], Parameters.TYPE_LONG.value)
@@ -1967,7 +1972,7 @@ class Backtest:
                         self.wallet.orders[self.wallet.INDEX]["NOT"] = "stop loss"
                         self.wallet.orders[self.wallet.INDEX]['Duration'] = str(int((datetime.strptime(df[0]['date'].iloc[i+1], '%Y-%m-%d %H:%M:%S') - datetime.strptime(self.wallet.orders[self.wallet.INDEX]['DateOpen'], '%Y-%m-%d %H:%M:%S')).total_seconds() / 60))+'min'
 
-                    if take_profit.check_trigger(row['close'], Parameters.TYPE_LONG.value):
+                    '''if take_profit.check_trigger(row['close'], Parameters.TYPE_LONG.value):
 
                         self.wallet.close_position(
                             side="SELL",
@@ -1978,8 +1983,9 @@ class Backtest:
 
                         self.wallet.orders[self.wallet.INDEX]["NOT"] = "take profit"
                         self.wallet.orders[self.wallet.INDEX]['Duration'] = str(int((datetime.strptime(df[0]['date'].iloc[i+1], '%Y-%m-%d %H:%M:%S') - datetime.strptime(self.wallet.orders[self.wallet.INDEX]['DateOpen'], '%Y-%m-%d %H:%M:%S')).total_seconds() / 60))+'min'
-                    
-                    '''if self.wallet.orders[self.wallet.INDEX]["Open"] + 2. < row['close'] and trailing_stop.check_trigger(row['close'], Parameters.TYPE_LONG.value):
+                    '''
+                    #if self.wallet.orders[self.wallet.INDEX]["Open"] + 2. < row['close'] and trailing_stop.check_trigger(row['close'], Parameters.TYPE_LONG.value):
+                    if trailing_stop.check_trigger(row['close'], Parameters.TYPE_LONG.value):
 
                         self.wallet.close_position(
                             side="SELL",
@@ -1990,7 +1996,7 @@ class Backtest:
 
                         self.wallet.orders[self.wallet.INDEX]["NOT"] = "trailing stop"
                         self.wallet.orders[self.wallet.INDEX]['Duration'] = str(int((datetime.strptime(df[0]['date'].iloc[i+1], '%Y-%m-%d %H:%M:%S') - datetime.strptime(self.wallet.orders[self.wallet.INDEX]['DateOpen'], '%Y-%m-%d %H:%M:%S')).total_seconds() / 60))+'min'
-                    '''
+                    
         return [ df[0], df[1] ]
     
     def backtest_4_1min_5min_borders_2_DEV(self, df):
@@ -1998,11 +2004,11 @@ class Backtest:
         # isRSIup?
 
         # find bars where RSI >= 70 for 1min data
-        filtered_70_df = df[0][df[0]['RSI_14'] >= (70 - 3)]
+        filtered_70_df = df[0][df[0]['RSI_14'] >= (70 - 1)]
         filtered_70_index = filtered_70_df.index.tolist()
 
         # find bars where RSI <= 30 for 1min data
-        filtered_30_df = df[0][df[0]['RSI_14'] <= (30 + 3)]
+        filtered_30_df = df[0][df[0]['RSI_14'] <= (30 + 1)]
         filtered_30_index = filtered_30_df.index.tolist()
 
         param_i = 0
@@ -2016,7 +2022,7 @@ class Backtest:
 
                     t = row['timestamp'] - Backtest.modulo_5_minutes(row['timestamp']) * 60 - 5 * 60
                     
-                    if abs(df[1]['RSI_14'].loc[ df[1]['timestamp'] == t ].values[0] - 70.) <= 3.:
+                    if abs(df[1]['RSI_14'].loc[ df[1]['timestamp'] == t ].values[0] - 70.) <= 4.:
                         print("Conditions satisfied, proceeding...")
 
                         param_i = i
@@ -2029,7 +2035,7 @@ class Backtest:
                         )
 
                         # stop loss:
-                        stop_loss = StopLoss(min(df[0]['open'].iloc[i], df[0]['close'].iloc[i]) - 1.)
+                        stop_loss = StopLoss(min(df[0]['open'].iloc[i], df[0]['close'].iloc[i]) - 2.)
 
                         print(self.wallet.orders)
 
@@ -2038,7 +2044,7 @@ class Backtest:
 
                     t = row['timestamp'] - Backtest.modulo_5_minutes(row['timestamp']) * 60 - 5 * 60
 
-                    if abs(df[1]['RSI_14'].loc[ df[1]['timestamp'] == t ].values[0] - 30.) <= 3.:
+                    if abs(df[1]['RSI_14'].loc[ df[1]['timestamp'] == t ].values[0] - 30.) <= 4.:
                         print("Conditions satisfied, proceeding...")
 
                         param_i = i
@@ -2051,7 +2057,7 @@ class Backtest:
                         )
 
                         # stop loss:
-                        stop_loss = StopLoss(max(df[0]['open'].iloc[i], df[0]['close'].iloc[i]) + 1.)
+                        stop_loss = StopLoss(max(df[0]['open'].iloc[i], df[0]['close'].iloc[i]) + 2.)
 
                         print(self.wallet.orders)
                 
@@ -2246,6 +2252,16 @@ class Backtest:
         return abs(df['RSI_14'].iloc[i] - 50) * df['volume'].iloc[i]
 
     @staticmethod
+    def generate_norm_coef(df, i):
+
+        return abs(df['RSI_14'].iloc[i] - 50) * Memory.normalize_data(df['volume'].iloc[i-9:i+1].values)[-1][0]
+    
+    @staticmethod
+    def generate_minmax_coef(df, i):
+
+        return abs(df['RSI_14'].iloc[i] - 50) * Memory.minmax_data(df['volume'].iloc[i-9:i+1].values)[-1][0]
+
+    @staticmethod
     def variation_rate(old_value, new_value):
 
         return ((new_value - old_value) / old_value) * 100
@@ -2263,12 +2279,16 @@ class Backtest:
         '''>>>>>>>>>>>>>>>>>>>>>>>'''
         date = []
         coef = []
+        n_coef = []
         taux = [None]
 
         for i, row in df[0].iterrows():
             #print(row['date'], Backtest.generate_coef(df[0], i))
             date.append(row['date'])
             coef.append(Backtest.generate_coef(df[0], i))
+        
+        for i, row in df[0].iloc[9:-1].iterrows():
+            n_coef.append(Backtest.generate_norm_coef(df[0], i))
 
         for i, row in df[0].iloc[1:].iterrows():
             taux.append(Backtest.variation_rate(coef[i-1], coef[i]))
@@ -2278,7 +2298,8 @@ class Backtest:
 
             if not self.wallet.is_open():
 
-                if Backtest.generate_coef(df[0], i) > 55000:
+                #if Backtest.generate_coef(df[0], i) > 55000:
+                if Backtest.generate_norm_coef(df[0], i) > 10:
 
                     if row['RSI_14'] > 50:
 
@@ -2289,8 +2310,11 @@ class Backtest:
                             date=df[0]['date'].iloc[i+1]
                         )
 
+                        # trailing stop
+                        trailing_stop = MyTrailingStop(row['close'] - 5.)
+
                         # stop loss:
-                        stop_loss = StopLoss(min(df[0]['open'].iloc[i], df[0]['close'].iloc[i]) - 5.)
+                        stop_loss = StopLoss(min(df[0]['open'].iloc[i], df[0]['close'].iloc[i]) - 3.)
 
                         # take profit
                         take_profit = TakeProfit(max(df[0]['open'].iloc[i], df[0]['close'].iloc[i]) + 5.)
@@ -2306,8 +2330,11 @@ class Backtest:
                             date=df[0]['date'].iloc[i+1]
                         )
 
+                        # trailing stop
+                        trailing_stop = MyTrailingStop(row['close'] + 5.)
+
                         # stop loss:
-                        stop_loss = StopLoss(min(df[0]['open'].iloc[i], df[0]['close'].iloc[i]) + 5.)
+                        stop_loss = StopLoss(min(df[0]['open'].iloc[i], df[0]['close'].iloc[i]) + 3.)
 
                         # take profit
                         take_profit = TakeProfit(max(df[0]['open'].iloc[i], df[0]['close'].iloc[i]) - 5.)
@@ -2323,7 +2350,9 @@ class Backtest:
 
                 if self.wallet.orders[self.wallet.INDEX]["Side"] == Parameters.TYPE_SHORT.value:
 
-                    if take_profit.check_trigger(row['close'], Parameters.TYPE_SHORT.value):
+                    trailing_stop.update_stop(row['close'], Parameters.TYPE_SHORT.value)
+
+                    '''if take_profit.check_trigger(row['close'], Parameters.TYPE_SHORT.value):
 
                         self.wallet.close_position(
                             side="BUY",
@@ -2333,6 +2362,18 @@ class Backtest:
                         )
 
                         self.wallet.orders[self.wallet.INDEX]["NOT"] = "take profit"
+                        self.wallet.orders[self.wallet.INDEX]['Duration'] = str(int((datetime.strptime(df[0]['date'].iloc[i+1], '%Y-%m-%d %H:%M:%S') - datetime.strptime(self.wallet.orders[self.wallet.INDEX]['DateOpen'], '%Y-%m-%d %H:%M:%S')).total_seconds() / 60))+'min'
+                    '''
+                    if self.wallet.orders[self.wallet.INDEX]["Open"] > row['close'] and trailing_stop.check_trigger(row['close'], Parameters.TYPE_SHORT.value):
+
+                        self.wallet.close_position(
+                            side="BUY",
+                            quantity=self.qty,
+                            price=df[0]["open"].iloc[i+1],
+                            date=df[0]['date'].iloc[i+1]
+                        )
+
+                        self.wallet.orders[self.wallet.INDEX]["NOT"] = "trailing stop"
                         self.wallet.orders[self.wallet.INDEX]['Duration'] = str(int((datetime.strptime(df[0]['date'].iloc[i+1], '%Y-%m-%d %H:%M:%S') - datetime.strptime(self.wallet.orders[self.wallet.INDEX]['DateOpen'], '%Y-%m-%d %H:%M:%S')).total_seconds() / 60))+'min'
                     
                     if stop_loss.check_trigger(row['close'], Parameters.TYPE_SHORT.value):
@@ -2348,8 +2389,10 @@ class Backtest:
                         self.wallet.orders[self.wallet.INDEX]['Duration'] = str(int((datetime.strptime(df[0]['date'].iloc[i+1], '%Y-%m-%d %H:%M:%S') - datetime.strptime(self.wallet.orders[self.wallet.INDEX]['DateOpen'], '%Y-%m-%d %H:%M:%S')).total_seconds() / 60))+'min'
 
                 elif self.wallet.orders[self.wallet.INDEX]["Side"] == Parameters.TYPE_LONG.value:
+
+                    trailing_stop.update_stop(row['close'], Parameters.TYPE_LONG.value)
                     
-                    if take_profit.check_trigger(row['close'], Parameters.TYPE_LONG.value):
+                    '''if take_profit.check_trigger(row['close'], Parameters.TYPE_LONG.value):
 
                         self.wallet.close_position(
                             side="SELL",
@@ -2359,6 +2402,18 @@ class Backtest:
                         )
 
                         self.wallet.orders[self.wallet.INDEX]["NOT"] = "take profit"
+                        self.wallet.orders[self.wallet.INDEX]['Duration'] = str(int((datetime.strptime(df[0]['date'].iloc[i+1], '%Y-%m-%d %H:%M:%S') - datetime.strptime(self.wallet.orders[self.wallet.INDEX]['DateOpen'], '%Y-%m-%d %H:%M:%S')).total_seconds() / 60))+'min'
+                    '''
+                    if self.wallet.orders[self.wallet.INDEX]["Open"] < row['close'] and trailing_stop.check_trigger(row['close'], Parameters.TYPE_LONG.value):
+
+                        self.wallet.close_position(
+                            side="SELL",
+                            quantity=self.qty,
+                            price=df[0]["open"].iloc[i+1],
+                            date=df[0]['date'].iloc[i+1]
+                        )
+
+                        self.wallet.orders[self.wallet.INDEX]["NOT"] = "trailing stop"
                         self.wallet.orders[self.wallet.INDEX]['Duration'] = str(int((datetime.strptime(df[0]['date'].iloc[i+1], '%Y-%m-%d %H:%M:%S') - datetime.strptime(self.wallet.orders[self.wallet.INDEX]['DateOpen'], '%Y-%m-%d %H:%M:%S')).total_seconds() / 60))+'min'
 
                     if stop_loss.check_trigger(row['close'], Parameters.TYPE_LONG.value):
@@ -2388,12 +2443,18 @@ class Backtest:
         '''>>>>>>>>>>>>>>>>>>>>>>>'''
         date = []
         coef = []
+        n_coef = []
+        m_coef = []
         taux = [None]
 
         for i, row in df[0].iterrows():
             #print(row['date'], Backtest.generate_coef(df[0], i))
             date.append(row['date'])
             coef.append(Backtest.generate_coef(df[0], i))
+
+        for i, row in df[0].iloc[9:-1].iterrows():
+            n_coef.append(Backtest.generate_norm_coef(df[0], i))
+            m_coef.append(Backtest.generate_minmax_coef(df[0], i))
 
         for i, row in df[0].iloc[1:].iterrows():
             taux.append(Backtest.variation_rate(coef[i-1], coef[i]))
@@ -2403,11 +2464,14 @@ class Backtest:
 
             if not self.wallet.is_open():
 
-                if Backtest.generate_coef(df[0], i) > 55000 and Backtest.generate_coef(df[0], i) < 155000:
+                #if Backtest.generate_coef(df[0], i) > 55000 and Backtest.generate_coef(df[0], i) < 155000:
                 #if Backtest.variation_rate(Backtest.generate_coef(df[0], i-1), Backtest.generate_coef(df[0], i)) > 200:
-                
+                #if Backtest.generate_norm_coef(df[0], i) > 10:
+                if Backtest.generate_minmax_coef(df[0], i) > 10:
+
                     #if row['RSI_14'] - df[0]['RSI_14'].iloc[i-3] > 0:
                     if row['RSI_14'] > df[0]['RSI_14'].iloc[i-5:i].mean():
+                    #if row['RSI_14'] > 50:
 
                         self.wallet.open_position(
                             side="BUY",
@@ -2417,10 +2481,10 @@ class Backtest:
                         )
 
                         # trailing stop
-                        trailing_stop = MyTrailingStop(row['close'] - 1.)
+                        trailing_stop = MyTrailingStop(row['close'] - 2.)
 
                         # stop loss:
-                        stop_loss = StopLoss(min(df[0]['open'].iloc[i], df[0]['close'].iloc[i]) - 2.)
+                        stop_loss = StopLoss(min(df[0]['open'].iloc[i], df[0]['close'].iloc[i]) - 3.)
 
                         # take profit
                         take_profit = TakeProfit(max(df[0]['open'].iloc[i], df[0]['close'].iloc[i]) + 5.)
@@ -2429,6 +2493,7 @@ class Backtest:
 
                     #elif row['RSI_14'] - df[0]['RSI_14'].iloc[i-3] < 0:
                     elif row['RSI_14'] < df[0]['RSI_14'].iloc[i-5:i].mean():
+                    #elif row['RSI_14'] < 50:
 
                         self.wallet.open_position(
                             side="SELL",
@@ -2438,10 +2503,10 @@ class Backtest:
                         )
 
                         # trailing stop
-                        trailing_stop = MyTrailingStop(row['close'] + 1.)
+                        trailing_stop = MyTrailingStop(row['close'] + 2.)
 
                         # stop loss:
-                        stop_loss = StopLoss(min(df[0]['open'].iloc[i], df[0]['close'].iloc[i]) + 2.)
+                        stop_loss = StopLoss(min(df[0]['open'].iloc[i], df[0]['close'].iloc[i]) + 3.)
 
                         # take profit
                         take_profit = TakeProfit(max(df[0]['open'].iloc[i], df[0]['close'].iloc[i]) - 5.)

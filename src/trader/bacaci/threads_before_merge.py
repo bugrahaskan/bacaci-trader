@@ -4,7 +4,6 @@ from .bacaci import Bacaci
 
 #from .wallet.wallet import Wallet
 from .wallet.strategy import Strategy
-from bacaci.memory import Memory
 
 
 class DataThread(threading.Thread):

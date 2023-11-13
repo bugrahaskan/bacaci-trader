@@ -29,29 +29,63 @@ class Binance:
 
         return client
     
-    def futures_open_position(self, symbol, side, quantity, isIsolated=True, type=Client.ORDER_TYPE_MARKET):
+    def futures_open_position(self, symbol, side, quantity, price, isIsolated=True, type=Client.ORDER_TYPE_MARKET):
         
         if side == self.client.SIDE_BUY:
-            #order = self.client.futures_create_order(
-            self.client.futures_create_order(
-                symbol=symbol,
-                isIsolated=isIsolated,
-                side=side,
-                type=type,
-                leverage=Parameters.INDEX_POINT.value, # Leverage value
-                quantity=quantity
-            )
+
+            if type == Client.ORDER_TYPE_MARKET:
+
+                #order = self.client.futures_create_order(
+                self.client.futures_create_order(
+                    symbol=symbol,
+                    isIsolated=isIsolated,
+                    side=side,
+                    type=type,
+                    leverage=Parameters.INDEX_POINT.value, # Leverage value
+                    quantity=quantity
+                )
+
+            elif type == Client.ORDER_TYPE_LIMIT:
+
+                #order = self.client.futures_create_order(
+                self.client.futures_create_order(
+                    symbol=symbol,
+                    isIsolated=isIsolated,
+                    side=side,
+                    type=type,
+                    timeInForce=Client.TIME_IN_FORCE_GTC,
+                    leverage=Parameters.INDEX_POINT.value, # Leverage value
+                    quantity=quantity,
+                    price=price-1. # develop that statement
+                )
         
         elif side == self.client.SIDE_SELL:
-            #order = self.client.futures_create_order(
-            self.client.futures_create_order(
-                symbol=symbol,
-                isIsolated=isIsolated,
-                side=side,
-                type=type,
-                leverage=Parameters.INDEX_POINT.value, # Leverage value
-                quantity=quantity
-            )
+
+            if type == Client.ORDER_TYPE_MARKET:
+
+                #order = self.client.futures_create_order(
+                self.client.futures_create_order(
+                    symbol=symbol,
+                    isIsolated=isIsolated,
+                    side=side,
+                    type=type,
+                    leverage=Parameters.INDEX_POINT.value, # Leverage value
+                    quantity=quantity
+                )
+
+            elif type == Client.ORDER_TYPE_LIMIT:
+
+                #order = self.client.futures_create_order(
+                self.client.futures_create_order(
+                    symbol=symbol,
+                    isIsolated=isIsolated,
+                    side=side,
+                    type=type,
+                    timeInForce=Client.TIME_IN_FORCE_GTC,
+                    leverage=Parameters.INDEX_POINT.value, # Leverage value
+                    quantity=quantity,
+                    price=price+1. # develop that statement
+                )
         
         # return necessary parts of "order" in json
         #return {
@@ -63,29 +97,63 @@ class Binance:
 
         return {}
 
-    def futures_close_position(self, symbol, side, quantity, isIsolated=True, type=Client.ORDER_TYPE_MARKET):
+    def futures_close_position(self, symbol, side, quantity, price, isIsolated=True, type=Client.ORDER_TYPE_MARKET):
         
         if side == self.client.SIDE_BUY:
-            #order = self.client.futures_create_order(
-            self.client.futures_create_order(
-                symbol=symbol,
-                isIsolated=isIsolated,
-                side=side,
-                type=type,
-                leverage=Parameters.INDEX_POINT.value, # Leverage value
-                quantity=quantity
-            )
+
+            if type == Client.ORDER_TYPE_MARKET:
+
+                #order = self.client.futures_create_order(
+                self.client.futures_create_order(
+                    symbol=symbol,
+                    isIsolated=isIsolated,
+                    side=side,
+                    type=type,
+                    leverage=Parameters.INDEX_POINT.value, # Leverage value
+                    quantity=quantity
+                )
+
+            elif type == Client.ORDER_TYPE_LIMIT:
+
+                #order = self.client.futures_create_order(
+                self.client.futures_create_order(
+                    symbol=symbol,
+                    isIsolated=isIsolated,
+                    side=side,
+                    type=type,
+                    timeInForce=Client.TIME_IN_FORCE_GTC,
+                    leverage=Parameters.INDEX_POINT.value, # Leverage value
+                    quantity=quantity,
+                    price=price # develop that statement
+                )
 
         if side == self.client.SIDE_SELL:
-            #order = self.client.futures_create_order(
-            self.client.futures_create_order(
-                symbol=symbol,
-                isIsolated=isIsolated,
-                side=side,
-                type=type,
-                leverage=Parameters.INDEX_POINT.value, # Leverage value
-                quantity=quantity
-            )
+
+            if type == Client.ORDER_TYPE_MARKET:
+            
+                #order = self.client.futures_create_order(
+                self.client.futures_create_order(
+                    symbol=symbol,
+                    isIsolated=isIsolated,
+                    side=side,
+                    type=type,
+                    leverage=Parameters.INDEX_POINT.value, # Leverage value
+                    quantity=quantity
+                )
+
+            elif type == Client.ORDER_TYPE_LIMIT:
+
+                #order = self.client.futures_create_order(
+                self.client.futures_create_order(
+                    symbol=symbol,
+                    isIsolated=isIsolated,
+                    side=side,
+                    type=type,
+                    timeInForce=Client.TIME_IN_FORCE_GTC,
+                    leverage=Parameters.INDEX_POINT.value, # Leverage value
+                    quantity=quantity,
+                    price=price # develop that statement
+                )
         
         # return necessary parts of "order" in json
         return {}

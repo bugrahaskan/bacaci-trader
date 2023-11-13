@@ -161,7 +161,7 @@ class Wallet:
 
         else:
             if self.API == Parameters.BINANCE.value:
-                self.binance.futures_open_position(self.SYMBOL, side, quantity)
+                self.binance.futures_open_position(self.SYMBOL, side, quantity, price)
 
             elif self.API == Parameters.ALPACA.value:
                 self.alpaca.open_position(self.SYMBOL, side, quantity)
@@ -199,7 +199,7 @@ class Wallet:
 
         else:
             if self.API == Parameters.BINANCE.value:
-                self.binance.futures_close_position(self.SYMBOL, side, quantity)
+                self.binance.futures_close_position(self.SYMBOL, side, quantity, price)
 
             elif self.API == Parameters.ALPACA.value:
                 self.alpaca.close_position(self.SYMBOL, side, quantity)
@@ -364,7 +364,7 @@ class MyTrailingStop:
     def update_stop(self, current_price, side):
 
         if side == Parameters.TYPE_LONG.value:
-            trailing_distance = (current_price - self.initial_stop) * (80 / 100)
+            trailing_distance = (current_price - self.current_stop) * (50 / 100)
             new_stop = current_price - trailing_distance
             
             #new_stop = current_price - 3.
@@ -377,7 +377,7 @@ class MyTrailingStop:
             return self.current_stop
 
         elif side == Parameters.TYPE_SHORT.value:
-            trailing_distance = (current_price - self.initial_stop) * (80 / 100)
+            trailing_distance = (current_price - self.current_stop) * (50 / 100)
             new_stop = current_price + trailing_distance
             
             #new_stop = current_price + 3.

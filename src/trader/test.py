@@ -2,7 +2,9 @@ import os
 import json
 import configparser
 import pandas as pd
-import pandas_ta as ta
+from pandas_ta import rsi as RSI
+import numpy as np
+import time
 
 from bacaci.data import Data
 from bacaci.database import Database
@@ -51,29 +53,23 @@ def read_data():
         ) for row in rows
     ]
 
+    selected_df_10s = dfs[0][ dfs[0]['timestamp'] % 10 == (int(time.time())%10) ]
+
     rsi = [
-        ind.rsi(df) for df in dfs
+        selected_df_10s.join(RSI(selected_df_10s['close'], length=14, sma=14)),
+        dfs[1].join(RSI(dfs[1]['close'], length=14, sma=14)),
+        dfs[2].join(RSI(dfs[2]['close'], length=14, sma=14))
+        #ind.rsi(df) for df in dfs
     ]
 
     return rsi
 
-df = read_data()
-#print(df)
+dfs = read_data()
+print(dfs)
 
-print(Memory.normalize_data_old(df[0]["volume"], name="volume"))
-print(Memory.normalize_data(df[0]['volume'].values))
+WRITER = pd.ExcelWriter("latest_data.xlsx")
 
-test = pd.DataFrame(
-    Memory.normalize_data(df[0]['volume'].values)
-)
-print(test)
+for index, item in enumerate(dfs):
+    item.to_excel(WRITER, sheet_name=f'data_{index}', index=False)
 
-last_keys_1m = [
-    -i for i in range(1,10)
-]
-print(last_keys_1m)
-
-from bacaci.notification import Notification
-
-mail = Notification()
-mail("davarchelebi@gmail.com", "test")
+WRITER.close()
