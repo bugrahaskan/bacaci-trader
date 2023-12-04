@@ -5,11 +5,16 @@ import pandas as pd
 from pandas_ta import rsi as RSI
 import numpy as np
 import time
+from scipy.signal import find_peaks
+from scipy.stats import gaussian_kde
+import matplotlib.pyplot as plt
 
 from bacaci.data import Data
 from bacaci.database import Database
 import bacaci.indicators as ind
 from bacaci.memory import Memory
+
+from bacaci.indicators import HeikinAshi
 
 class TrailingStop:
 
@@ -55,21 +60,21 @@ def read_data():
 
     selected_df_10s = dfs[0][ dfs[0]['timestamp'] % 10 == (int(time.time())%10) ]
 
+    temp_df1 = dfs[1]
+    temp_df1.loc[len(dfs[1].index)] = { 'close': selected_df_10s['close'].iloc[-1] }
+    temp_df2 = dfs[2]
+    temp_df2.loc[len(dfs[2].index)] = { 'close': selected_df_10s['close'].iloc[-1] }
+
+    #print(temp_df)
+
     rsi = [
         selected_df_10s.join(RSI(selected_df_10s['close'], length=14, sma=14)),
-        dfs[1].join(RSI(dfs[1]['close'], length=14, sma=14)),
-        dfs[2].join(RSI(dfs[2]['close'], length=14, sma=14))
+        dfs[1].join(RSI(temp_df1['close'], length=14, sma=14)),
+        dfs[2].join(RSI(temp_df2['close'], length=14, sma=14))
         #ind.rsi(df) for df in dfs
     ]
 
     return rsi
 
 dfs = read_data()
-print(dfs)
-
-WRITER = pd.ExcelWriter("latest_data.xlsx")
-
-for index, item in enumerate(dfs):
-    item.to_excel(WRITER, sheet_name=f'data_{index}', index=False)
-
-WRITER.close()
+print(dfs[2])

@@ -29,14 +29,14 @@ class Binance:
 
         return client
     
-    def futures_open_position(self, symbol, side, quantity, price, isIsolated=True, type=Client.ORDER_TYPE_MARKET):
+    def futures_open_position(self, symbol, side, quantity, price=0., isIsolated=True, type=Client.FUTURE_ORDER_TYPE_MARKET):
         
         if side == self.client.SIDE_BUY:
 
-            if type == Client.ORDER_TYPE_MARKET:
+            if type == Client.FUTURE_ORDER_TYPE_MARKET:
 
-                #order = self.client.futures_create_order(
-                self.client.futures_create_order(
+                order = self.client.futures_create_order(
+                #self.client.futures_create_order(
                     symbol=symbol,
                     isIsolated=isIsolated,
                     side=side,
@@ -45,10 +45,10 @@ class Binance:
                     quantity=quantity
                 )
 
-            elif type == Client.ORDER_TYPE_LIMIT:
+            elif type == Client.FUTURE_ORDER_TYPE_LIMIT:
 
-                #order = self.client.futures_create_order(
-                self.client.futures_create_order(
+                order = self.client.futures_create_order(
+                #self.client.futures_create_order(
                     symbol=symbol,
                     isIsolated=isIsolated,
                     side=side,
@@ -56,15 +56,15 @@ class Binance:
                     timeInForce=Client.TIME_IN_FORCE_GTC,
                     leverage=Parameters.INDEX_POINT.value, # Leverage value
                     quantity=quantity,
-                    price=price-1. # develop that statement
+                    price=price-.01 # develop that statement
                 )
         
         elif side == self.client.SIDE_SELL:
 
-            if type == Client.ORDER_TYPE_MARKET:
+            if type == Client.FUTURE_ORDER_TYPE_MARKET:
 
-                #order = self.client.futures_create_order(
-                self.client.futures_create_order(
+                order = self.client.futures_create_order(
+                #self.client.futures_create_order(
                     symbol=symbol,
                     isIsolated=isIsolated,
                     side=side,
@@ -73,10 +73,10 @@ class Binance:
                     quantity=quantity
                 )
 
-            elif type == Client.ORDER_TYPE_LIMIT:
+            elif type == Client.FUTURE_ORDER_TYPE_LIMIT:
 
-                #order = self.client.futures_create_order(
-                self.client.futures_create_order(
+                order = self.client.futures_create_order(
+                #self.client.futures_create_order(
                     symbol=symbol,
                     isIsolated=isIsolated,
                     side=side,
@@ -84,76 +84,85 @@ class Binance:
                     timeInForce=Client.TIME_IN_FORCE_GTC,
                     leverage=Parameters.INDEX_POINT.value, # Leverage value
                     quantity=quantity,
-                    price=price+1. # develop that statement
+                    price=price+0.01 # develop that statement
                 )
         
         # return necessary parts of "order" in json
-        #return {
-        #    'Symbol': order['symbol'],
-        #    'Side': order['side'], # correct in detail
-        #    'Open': order['price'],
-        #    'Commission_open': order['fills'][0]['commission'] # in btc
-        #}
+        return {
+            'OrderID': order['orderId'],
+            'Symbol': order['symbol'],
+            'Side': order['side'], # correct in detail
+            'Open': order['price']
+            #'Commission_open': order['fills'][0]['commission'] # in btc
+        }
 
-        return {}
+        #return {}
 
-    def futures_close_position(self, symbol, side, quantity, price, isIsolated=True, type=Client.ORDER_TYPE_MARKET):
+    def futures_close_position(self, symbol, side, quantity, price=0., isIsolated=True, type=Client.FUTURE_ORDER_TYPE_MARKET):
         
         if side == self.client.SIDE_BUY:
 
-            if type == Client.ORDER_TYPE_MARKET:
+            if type == Client.FUTURE_ORDER_TYPE_MARKET:
 
-                #order = self.client.futures_create_order(
-                self.client.futures_create_order(
+                order = self.client.futures_create_order(
+                #self.client.futures_create_order(
                     symbol=symbol,
-                    isIsolated=isIsolated,
+                    #isIsolated=isIsolated,
                     side=side,
                     type=type,
                     leverage=Parameters.INDEX_POINT.value, # Leverage value
                     quantity=quantity
                 )
 
-            elif type == Client.ORDER_TYPE_LIMIT:
+            elif type == Client.FUTURE_ORDER_TYPE_LIMIT:
 
-                #order = self.client.futures_create_order(
-                self.client.futures_create_order(
+                order = self.client.futures_create_order(
+                #self.client.futures_create_order(
                     symbol=symbol,
-                    isIsolated=isIsolated,
+                    #isIsolated=isIsolated,
                     side=side,
                     type=type,
                     timeInForce=Client.TIME_IN_FORCE_GTC,
                     leverage=Parameters.INDEX_POINT.value, # Leverage value
                     quantity=quantity,
-                    price=price # develop that statement
+                    price=price+.01 # develop that statement
                 )
 
         if side == self.client.SIDE_SELL:
 
-            if type == Client.ORDER_TYPE_MARKET:
+            if type == Client.FUTURE_ORDER_TYPE_MARKET:
             
-                #order = self.client.futures_create_order(
-                self.client.futures_create_order(
+                order = self.client.futures_create_order(
+                #self.client.futures_create_order(
                     symbol=symbol,
-                    isIsolated=isIsolated,
+                    #isIsolated=isIsolated,
                     side=side,
                     type=type,
                     leverage=Parameters.INDEX_POINT.value, # Leverage value
                     quantity=quantity
                 )
 
-            elif type == Client.ORDER_TYPE_LIMIT:
+            elif type == Client.FUTURE_ORDER_TYPE_LIMIT:
 
-                #order = self.client.futures_create_order(
-                self.client.futures_create_order(
+                order = self.client.futures_create_order(
+                #self.client.futures_create_order(
                     symbol=symbol,
-                    isIsolated=isIsolated,
+                    #isIsolated=isIsolated,
                     side=side,
                     type=type,
                     timeInForce=Client.TIME_IN_FORCE_GTC,
                     leverage=Parameters.INDEX_POINT.value, # Leverage value
                     quantity=quantity,
-                    price=price # develop that statement
+                    price=price-.01 # develop that statement
                 )
         
         # return necessary parts of "order" in json
-        return {}
+        return {
+            'OrderID': order['orderId'],
+            'Symbol': order['symbol'],
+            'Side': order['side'], # correct in detail
+            'Open': order['price']
+            #'Commission_open': order['fills'][0]['commission'] # in btc
+        }
+
+        #return {}

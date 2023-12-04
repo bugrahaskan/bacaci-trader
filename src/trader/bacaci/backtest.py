@@ -48,7 +48,7 @@ class Backtest:
         #rsi1 = RSI(df1)
         #res = self.backtest_4_1min_5min_stabil_rsi_DEV(df=[rsi0,rsi1])
 
-        res = self.backtest_4_1min_5min_borders_coef_2_DEV(df=self.read_data(test_1min))
+        res = self.backtest_dummy(df=self.read_data(test_1min))
         #res = self.backtest_dummy(df=self.read_data(1000))
 
         self.write_to_excel(res)
@@ -103,7 +103,7 @@ class Backtest:
     
     def backtest_dummy(self, df):
 
-        for i, row in df[1].iloc[100:].iterrows():
+        for i, row in df[1].iloc[100:-1].iterrows():
 
             if not self.wallet.is_open():
                 # check start conditions
@@ -117,6 +117,8 @@ class Backtest:
             elif self.wallet.is_open():
                 # check stop conditions
                 print(i)
+
+        return [ df[0], df[1] ]
     
     def backtest_1(self, df):
 
@@ -1544,6 +1546,9 @@ class Backtest:
     
     def backtest_4_1min_5min_stabil_rsi(self, df):
 
+        df[0] = df[1]
+        df[1] = df[2]
+
         # find bars where RSI >= 70 for 1min data
         filtered_70_df = df[0][ df[0]['RSI_14'] >= (70 - 0) ]
         filtered_70_index = filtered_70_df.index.tolist()
@@ -1576,7 +1581,9 @@ class Backtest:
                         # stop loss:
                         #stop_loss = StopLoss(df[1]['high'].iloc[i-9:i].max() * 1.2)
                         #stop_loss = StopLoss(df[0]['close'].iloc[i] + 5.)
-                        stop_loss = StopLoss(max(df[0]['open'].iloc[i], df[0]['close'].iloc[i]) + 5.)
+                        stop_loss = StopLoss(max(df[0]['open'].iloc[i], df[0]['close'].iloc[i]) + 2.5)
+
+                        take_profit = TakeProfit(df[0]['open'].iloc[i+1] - 10.)
 
                         print(self.wallet.orders)
 
@@ -1600,7 +1607,9 @@ class Backtest:
                         # stop loss:
                         #stop_loss = StopLoss(df[1]['low'].iloc[i-9:i].min() * 1.2)
                         #stop_loss = StopLoss(df[0]['close'].iloc[i] - 5.)
-                        stop_loss = StopLoss(min(df[0]['open'].iloc[i], df[0]['close'].iloc[i]) - 5.)
+                        stop_loss = StopLoss(min(df[0]['open'].iloc[i], df[0]['close'].iloc[i]) - 2.5)
+
+                        take_profit = TakeProfit(df[0]['open'].iloc[i+1] + 10.)
 
                         print(self.wallet.orders)
 
@@ -1630,8 +1639,8 @@ class Backtest:
                         self.wallet.orders[self.wallet.INDEX]['Duration'] = str(int((datetime.strptime(df[0]['date'].iloc[i+1], '%Y-%m-%d %H:%M:%S') - datetime.strptime(self.wallet.orders[self.wallet.INDEX]['DateOpen'], '%Y-%m-%d %H:%M:%S')).total_seconds() / 60))+'min'
 
                     # strict comparison needed.
-                    elif abs(df[1]['RSI_14'].loc[ df[1]['timestamp'] == t ].values[0] - 30.) <= 5.:
-                    #elif df[1]['RSI_14'].loc[ df[1]['timestamp'] == t ].values[0] <= (30 + 3):
+                    #elif abs(df[1]['RSI_14'].loc[ df[1]['timestamp'] == t ].values[0] - 30.) <= 5.:
+                    '''elif df[1]['RSI_14'].loc[ df[1]['timestamp'] == t ].values[0] <= (30 + 3):
 
                         self.wallet.close_position(
                             side="BUY",
@@ -1641,6 +1650,18 @@ class Backtest:
                         )
 
                         self.wallet.orders[self.wallet.INDEX]["NOT"] = "rsi"
+                        self.wallet.orders[self.wallet.INDEX]['Duration'] = str(int((datetime.strptime(df[0]['date'].iloc[i+1], '%Y-%m-%d %H:%M:%S') - datetime.strptime(self.wallet.orders[self.wallet.INDEX]['DateOpen'], '%Y-%m-%d %H:%M:%S')).total_seconds() / 60))+'min'
+                    '''
+                    if row['RSI_14'] <= (30 + 3.) or take_profit.check_trigger(row['close'], Parameters.TYPE_SHORT.value):
+
+                        self.wallet.close_position(
+                            side="BUY",
+                            quantity=self.qty,
+                            price=df[0]["open"].iloc[i+1],
+                            date=df[0]['date'].iloc[i+1]
+                        )
+
+                        self.wallet.orders[self.wallet.INDEX]["NOT"] = "rsi or take_profit"
                         self.wallet.orders[self.wallet.INDEX]['Duration'] = str(int((datetime.strptime(df[0]['date'].iloc[i+1], '%Y-%m-%d %H:%M:%S') - datetime.strptime(self.wallet.orders[self.wallet.INDEX]['DateOpen'], '%Y-%m-%d %H:%M:%S')).total_seconds() / 60))+'min'
 
                 elif self.wallet.orders[self.wallet.INDEX]["Side"] == Parameters.TYPE_LONG.value:
@@ -1662,8 +1683,8 @@ class Backtest:
                         self.wallet.orders[self.wallet.INDEX]['Duration'] = str(int((datetime.strptime(df[0]['date'].iloc[i+1], '%Y-%m-%d %H:%M:%S') - datetime.strptime(self.wallet.orders[self.wallet.INDEX]['DateOpen'], '%Y-%m-%d %H:%M:%S')).total_seconds() / 60))+'min'
                     
                     # strict comparison needed.
-                    elif abs(df[1]['RSI_14'].loc[ df[1]['timestamp'] == t ].values[0] - 70.) <= 5.:
-                    #elif df[1]['RSI_14'].loc[ df[1]['timestamp'] == t ].values[0] >= (70 - 3):
+                    #elif abs(df[1]['RSI_14'].loc[ df[1]['timestamp'] == t ].values[0] - 70.) <= 5.:
+                    '''elif df[1]['RSI_14'].loc[ df[1]['timestamp'] == t ].values[0] >= (70 - 3):
 
                         self.wallet.close_position(
                             side="SELL",
@@ -1673,6 +1694,18 @@ class Backtest:
                         )
 
                         self.wallet.orders[self.wallet.INDEX]["NOT"] = "rsi"
+                        self.wallet.orders[self.wallet.INDEX]['Duration'] = str(int((datetime.strptime(df[0]['date'].iloc[i+1], '%Y-%m-%d %H:%M:%S') - datetime.strptime(self.wallet.orders[self.wallet.INDEX]['DateOpen'], '%Y-%m-%d %H:%M:%S')).total_seconds() / 60))+'min'
+                    '''
+                    if row['RSI_14'] >= (70 - 3.) or take_profit.check_trigger(row['close'], Parameters.TYPE_LONG.value):
+
+                        self.wallet.close_position(
+                            side="SELL",
+                            quantity=self.qty,
+                            price=df[0]["open"].iloc[i+1],
+                            date=df[0]['date'].iloc[i+1]
+                        )
+
+                        self.wallet.orders[self.wallet.INDEX]["NOT"] = "rsi or take_profit"
                         self.wallet.orders[self.wallet.INDEX]['Duration'] = str(int((datetime.strptime(df[0]['date'].iloc[i+1], '%Y-%m-%d %H:%M:%S') - datetime.strptime(self.wallet.orders[self.wallet.INDEX]['DateOpen'], '%Y-%m-%d %H:%M:%S')).total_seconds() / 60))+'min'
 
         return [ df[0], df[1] ]
@@ -2506,10 +2539,10 @@ class Backtest:
                         trailing_stop = MyTrailingStop(row['close'] + 2.)
 
                         # stop loss:
-                        stop_loss = StopLoss(min(df[0]['open'].iloc[i], df[0]['close'].iloc[i]) + 3.)
+                        stop_loss = StopLoss(max(df[0]['open'].iloc[i], df[0]['close'].iloc[i]) + 3.)
 
                         # take profit
-                        take_profit = TakeProfit(max(df[0]['open'].iloc[i], df[0]['close'].iloc[i]) - 5.)
+                        take_profit = TakeProfit(min(df[0]['open'].iloc[i], df[0]['close'].iloc[i]) - 5.)
 
                         print(self.wallet.orders)
 
@@ -2603,3 +2636,152 @@ class Backtest:
                         self.wallet.orders[self.wallet.INDEX]['Duration'] = str(int((datetime.strptime(df[0]['date'].iloc[i+1], '%Y-%m-%d %H:%M:%S') - datetime.strptime(self.wallet.orders[self.wallet.INDEX]['DateOpen'], '%Y-%m-%d %H:%M:%S')).total_seconds() / 60))+'min'
         
         return [ df[0], df[1] ]
+    
+    def test_coef(self, df):
+        # with 1sec Data...
+        
+        actual_coef = 0.
+
+        for i, row in df[0].iloc[9:-1].iterrows():
+
+            #with open("coef_output.csv", "a") as r:
+            #    d = "{},{:.{}f}\n".format(i, Backtest.generate_minmax_coef(df[0], i), 2)
+            #    r.write(d)
+        
+            if not self.wallet.is_open():
+
+                if Backtest.generate_minmax_coef(df[0], i) > 10:
+
+                    actual_coef = Backtest.generate_minmax_coef(df[0], i)
+
+                    if row['RSI_14'] > 50 and row['RSI_14'] > df[0]['RSI_14'].iloc[i-5:i].mean():
+
+                        self.wallet.open_position(
+                            side="BUY",
+                            quantity=self.qty,
+                            price=df[0]['open'].iloc[i+1],
+                            date=df[0]['date'].iloc[i+1]
+                        )
+
+                        # trailing stop
+                        trailing_stop = MyTrailingStop(row['close'] - 2.)
+
+                        # stop loss:
+                        stop_loss = StopLoss(min(df[0]['open'].iloc[i], df[0]['close'].iloc[i]) - 2.)
+
+                        # take profit
+                        take_profit = TakeProfit(max(df[0]['open'].iloc[i], df[0]['close'].iloc[i]) + 5.)
+
+                        print(self.wallet.orders)
+
+                    elif row['RSI_14'] < 50 and row['RSI_14'] < df[0]['RSI_14'].iloc[i-5:i].mean():
+
+                        self.wallet.open_position(
+                            side="SELL",
+                            quantity=self.qty,
+                            price=df[0]['open'].iloc[i+1],
+                            date=df[0]['date'].iloc[i+1]
+                        )
+
+                        # trailing stop
+                        trailing_stop = MyTrailingStop(row['close'] + 2.)
+
+                        # stop loss:
+                        stop_loss = StopLoss(max(df[0]['open'].iloc[i], df[0]['close'].iloc[i]) + 2.)
+
+                        # take profit
+                        take_profit = TakeProfit(min(df[0]['open'].iloc[i], df[0]['close'].iloc[i]) - 5.)
+
+                        print(self.wallet.orders)
+
+                else:
+                    print("...")
+
+            elif self.wallet.is_open():
+
+                print("waiting for close conditions")
+
+                if self.wallet.orders[self.wallet.INDEX]["Side"] == Parameters.TYPE_SHORT.value:
+
+                    trailing_stop.update_stop(row['close'], Parameters.TYPE_SHORT.value)
+                    '''
+                    if self.wallet.orders[self.wallet.INDEX]["Open"] > row['close'] and trailing_stop.check_trigger(row['close'], Parameters.TYPE_SHORT.value):
+
+                        self.wallet.close_position(
+                            side="BUY",
+                            quantity=self.qty,
+                            price=df[0]["open"].iloc[i+1],
+                            date=df[0]['date'].iloc[i+1]
+                        )
+
+                        self.wallet.orders[self.wallet.INDEX]["NOT"] = "trailing stop"
+                        self.wallet.orders[self.wallet.INDEX]['Duration'] = str(int((datetime.strptime(df[0]['date'].iloc[i+1], '%Y-%m-%d %H:%M:%S') - datetime.strptime(self.wallet.orders[self.wallet.INDEX]['DateOpen'], '%Y-%m-%d %H:%M:%S')).total_seconds() / 60))+'min'
+                    '''
+                    if Backtest.generate_minmax_coef(df[0], i) > actual_coef:
+
+                        self.wallet.close_position(
+                            side="BUY",
+                            quantity=self.qty,
+                            price=df[0]['open'].iloc[i+1],
+                            date=df[0]['date'].iloc[i+1]
+                        )
+
+                        self.wallet.orders[self.wallet.INDEX]["NOT"] = "coef comparison"
+                        self.wallet.orders[self.wallet.INDEX]['Duration'] = str(int((datetime.strptime(df[0]['date'].iloc[i+1], '%Y-%m-%d %H:%M:%S') - datetime.strptime(self.wallet.orders[self.wallet.INDEX]['DateOpen'], '%Y-%m-%d %H:%M:%S')).total_seconds() / 60))+'min'
+                    
+                    elif stop_loss.check_trigger(row['close'], Parameters.TYPE_SHORT.value):
+
+                        self.wallet.close_position(
+                            side="BUY",
+                            quantity=self.qty,
+                            price=df[0]['open'].iloc[i+1],
+                            date=df[0]['date'].iloc[i+1]
+                        )
+
+                        self.wallet.orders[self.wallet.INDEX]["NOT"] = "stop loss"
+                        self.wallet.orders[self.wallet.INDEX]['Duration'] = str(int((datetime.strptime(df[0]['date'].iloc[i+1], '%Y-%m-%d %H:%M:%S') - datetime.strptime(self.wallet.orders[self.wallet.INDEX]['DateOpen'], '%Y-%m-%d %H:%M:%S')).total_seconds() / 60))+'min'
+
+                elif self.wallet.orders[self.wallet.INDEX]["Side"] == Parameters.TYPE_LONG.value:
+
+                    trailing_stop.update_stop(row['close'], Parameters.TYPE_LONG.value)
+                    
+                    '''
+                    if self.wallet.orders[self.wallet.INDEX]["Open"] < row['close'] and trailing_stop.check_trigger(row['close'], Parameters.TYPE_LONG.value):
+
+                        self.wallet.close_position(
+                            side="SELL",
+                            quantity=self.qty,
+                            price=df[0]["open"].iloc[i+1],
+                            date=df[0]['date'].iloc[i+1]
+                        )
+
+                        self.wallet.orders[self.wallet.INDEX]["NOT"] = "trailing stop"
+                        self.wallet.orders[self.wallet.INDEX]['Duration'] = str(int((datetime.strptime(df[0]['date'].iloc[i+1], '%Y-%m-%d %H:%M:%S') - datetime.strptime(self.wallet.orders[self.wallet.INDEX]['DateOpen'], '%Y-%m-%d %H:%M:%S')).total_seconds() / 60))+'min'
+                    '''
+                    if Backtest.generate_minmax_coef(df[0], i) > actual_coef:
+
+                        self.wallet.close_position(
+                            side="SELL",
+                            quantity=self.qty,
+                            price=df[0]['open'].iloc[i+1],
+                            date=df[0]['date'].iloc[i+1]
+                        )
+
+                        self.wallet.orders[self.wallet.INDEX]["NOT"] = "coef comparison"
+                        self.wallet.orders[self.wallet.INDEX]['Duration'] = str(int((datetime.strptime(df[0]['date'].iloc[i+1], '%Y-%m-%d %H:%M:%S') - datetime.strptime(self.wallet.orders[self.wallet.INDEX]['DateOpen'], '%Y-%m-%d %H:%M:%S')).total_seconds() / 60))+'min'
+                    
+                    elif stop_loss.check_trigger(row['close'], Parameters.TYPE_LONG.value):
+
+                        self.wallet.close_position(
+                            side="SELL",
+                            quantity=self.qty,
+                            price=df[0]['open'].iloc[i+1],
+                            date=df[0]['date'].iloc[i+1]
+                        )
+
+                        self.wallet.orders[self.wallet.INDEX]["NOT"] = "stop loss"
+                        self.wallet.orders[self.wallet.INDEX]['Duration'] = str(int((datetime.strptime(df[0]['date'].iloc[i+1], '%Y-%m-%d %H:%M:%S') - datetime.strptime(self.wallet.orders[self.wallet.INDEX]['DateOpen'], '%Y-%m-%d %H:%M:%S')).total_seconds() / 60))+'min'
+
+        return [ df[0], df[1], df[2] ]
+    
+    

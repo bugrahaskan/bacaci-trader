@@ -1,0 +1,11 @@
+Bacacı API Key:
+public: A2FZF6VgnGRXpWPEGWyD16fHO2izBOKjJamqAzAuDOy9PHdhSXxE7JC1CnCwzJ1D
+secret: ZRplO9kty74pCVB13xo83dWFBhoHslr8iFABY586NJS82y1q1p9frs7xCXbuKhID
+
+equity:
+1885,90 USDT
+
+
+BugraAPI:
+public: pbcB3t1IuMwRCUbCqaTgl1YrjjiY1mcDbz2yWIpZFwT1irzk5PIk1CewE2d5Hwos
+secret: 1C6k5S0XFyXXFUvP2f8AJiXKKECwb4OmIxsxLPXVTvpgN0MtA0Xybrvk5CLvu9vs

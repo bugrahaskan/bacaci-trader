@@ -72,19 +72,23 @@ class Memory:
                 "historical_prices": {
                     "1s": {}, # correct
                     "1m": {},
-                    "5m": {}
+                    "5m": {},
+                    "15m": {}
                 },
                 "current_state": {
                     "isGreen": None,
                     "isRed": None,
                     "isExtremum": None,
                     "isMax": None,
-                    "isMin": None
+                    "isMin": None,
+                    "rsi-1m": None,
+                    "rsi-5m": None,
+                    "percent": None
                 }
             }
 
-            #intervals = ['1s', '1m', '5m', '15m']
-            intervals = ['1s', '1m', '5m']
+            intervals = ['1s', '1m', '5m', '15m']
+            #intervals = ['1s', '1m', '5m']
 
             rows = [
                 self.database.fetch_rows(
@@ -100,10 +104,10 @@ class Memory:
                     Data.table_name(self.SYMBOL, intervals[2], self.API),
                     limit=100
                 ),
-                #self.database.fetch_rows(
-                #    Data.table_name(self.SYMBOL, intervals[3], self.API),
-                #    limit=100
-                #)
+                self.database.fetch_rows(
+                    Data.table_name(self.SYMBOL, intervals[3], self.API),
+                    limit=16
+                )
             ]
 
             dfs = [
@@ -153,18 +157,26 @@ class Memory:
             grouped_sums_5m_array = np.array(grouped_sums_5m)
 
             # real-time(intrabar) RSI with pandas_ta:
-            rsi = [
+            '''rsi = [
                 selected_df_10s.join(RSI(selected_df_10s['close'], length=14, sma=14)),
                 selected_df_back_1m.join(RSI(selected_df_back_1m['close'], length=14, sma=14)),
                 selected_df_back_5m.join(RSI(selected_df_back_5m['close'], length=14, sma=14))
-            ]
+            ]'''
+
+            temp_df1 = dfs[1]
+            temp_df1.loc[len(dfs[1].index)] = { 'close': selected_df_10s['close'].iloc[-1] }
+            temp_df2 = dfs[2]
+            temp_df2.loc[len(dfs[2].index)] = { 'close': selected_df_10s['close'].iloc[-1] }
+            temp_df3 = dfs[3]
+            temp_df3.loc[len(dfs[3].index)] = { 'close': selected_df_10s['close'].iloc[-1] }
 
             # bar RSI with pandas_ta:
-            '''bar_rsi = [
+            rsi = [
                 selected_df_10s.join(RSI(selected_df_10s['close'], length=14, sma=14)),
-                dfs[1].join(RSI(dfs[1]['close'], length=14, sma=14)),
-                dfs[2].join(RSI(dfs[2]['close'], length=14, sma=14))
-            ]'''
+                dfs[1].join(RSI(temp_df1['close'], length=14, sma=14)),
+                dfs[2].join(RSI(temp_df2['close'], length=14, sma=14)),
+                dfs[3].join(RSI(temp_df3['close'], length=14, sma=14))
+            ]
 
             rsi = [
                 r.reset_index(drop=True) for r in rsi
@@ -172,23 +184,30 @@ class Memory:
 
             normalized_data = [
                 pd.DataFrame(Memory.normalize_data(rsi[0]["volume"].iloc[-9:].values), columns=['normalized_volume']),
-                pd.DataFrame(Memory.normalize_data(grouped_sums_1m_array), columns=['normalized_volume']),
-                pd.DataFrame(Memory.normalize_data(grouped_sums_5m_array), columns=['normalized_volume'])
+                #pd.DataFrame(Memory.normalize_data(grouped_sums_1m_array), columns=['normalized_volume']),
+                #pd.DataFrame(Memory.normalize_data(grouped_sums_5m_array), columns=['normalized_volume'])
+                pd.DataFrame(Memory.normalize_data(rsi[1]["volume"].values[:-1]), columns=['normalized_volume']),
+                pd.DataFrame(Memory.normalize_data(rsi[2]["volume"].values[:-1]), columns=['normalized_volume']),
+                pd.DataFrame()
             ]
 
             # NOTICE:
             # print(Memory.normalize_data(grouped_sums_1m_array))
 
             scaled_data = [
-                Memory.scale_data(rsi[0]["volume"], name="volume"),
-                Memory.scale_data(rsi[1]["volume"], name="volume"),
-                Memory.scale_data(rsi[2]["volume"], name="volume")
+                Memory.scale_data(rsi[0]["volume"].iloc[:-1], name="volume"),
+                Memory.scale_data(rsi[1]["volume"].iloc[:-1], name="volume"),
+                Memory.scale_data(rsi[2]["volume"].iloc[:-1], name="volume"),
+                Memory.scale_data(rsi[3]["volume"].iloc[:-1], name="volume")
             ]
 
             minmaxed_data = [
                 pd.DataFrame(Memory.minmax_data(rsi[0]["volume"].iloc[-9:].values), columns=['minmax_volume']),
-                pd.DataFrame(Memory.minmax_data(grouped_sums_1m_array), columns=['minmax_volume']),
-                pd.DataFrame(Memory.minmax_data(grouped_sums_5m_array), columns=['minmax_volume'])
+                #pd.DataFrame(Memory.minmax_data(grouped_sums_1m_array), columns=['minmax_volume']),
+                #pd.DataFrame(Memory.minmax_data(grouped_sums_5m_array), columns=['minmax_volume'])
+                pd.DataFrame(Memory.minmax_data(rsi[1]["volume"].iloc[-10:-1].values), columns=['minmax_volume']),
+                pd.DataFrame(Memory.minmax_data(rsi[2]["volume"].iloc[-10:-1].values), columns=['minmax_volume']),
+                pd.DataFrame()
             ]
 
             data = []
@@ -214,11 +233,15 @@ class Memory:
             
             self.memory["current_date"] = int(time.time())
 
+            self.memory["current_state"]["rsi-1m"] = data[1]["RSI_14"].iloc[-1]
+            self.memory["current_state"]["rsi-5m"] = data[2]["RSI_14"].iloc[-1]
+            self.memory["current_state"]["rsi-15m"] = data[3]["RSI_14"].iloc[-1]
+
             # add 1s.
             for i, row in data[0].iterrows():
                 #if row[0] % 10 == 0: # remove if necessary
-                self.memory["historical_prices"]["1s"][row.iloc[0]] = {
-                    "t": row.iloc[0],
+                self.memory["historical_prices"]["1s"][int(row.iloc[0])] = {
+                    "t": int(row.iloc[0]),
                     "o": row.iloc[2],
                     "h": row.iloc[3],
                     "l": row.iloc[4],
@@ -235,9 +258,9 @@ class Memory:
                 }
             print("fetched 1s data")
 
-            for i, row in data[1].iterrows():
-                self.memory["historical_prices"]["1m"][row.iloc[0]] = {
-                    "t": row.iloc[0],
+            for i, row in data[1].iloc[:-1].iterrows():
+                self.memory["historical_prices"]["1m"][int(row.iloc[0])] = {
+                    "t": int(row.iloc[0]),
                     "o": row.iloc[2],
                     "h": row.iloc[3],
                     "l": row.iloc[4],
@@ -254,9 +277,9 @@ class Memory:
                 }
             print("fetched 1m data")
 
-            for i, row in data[2].iterrows():
-                self.memory["historical_prices"]["5m"][row.iloc[0]] = {
-                    "t": row.iloc[0],
+            for i, row in data[2].iloc[:-1].iterrows():
+                self.memory["historical_prices"]["5m"][int(row.iloc[0])] = {
+                    "t": int(row.iloc[0]),
                     "o": row.iloc[2],
                     "h": row.iloc[3],
                     "l": row.iloc[4],
@@ -273,6 +296,25 @@ class Memory:
                 }
             print("fetched 5m data")
             # ...
+
+            for i, row in data[3].iloc[:-1].iterrows():
+                self.memory["historical_prices"]["15m"][int(row.iloc[0])] = {
+                    "t": int(row.iloc[0]),
+                    "o": row.iloc[2],
+                    "h": row.iloc[3],
+                    "l": row.iloc[4],
+                    "c": row.iloc[5],
+                    "v": row.iloc[6],
+                    "rolling_v": None,
+                    "rsi": row.iloc[7],
+                    #"rsiUP": bool((normalized[1]['RSI_14'].iloc[i] - normalized[1]['RSI_14'].iloc[i-1]) > 0),
+                    #"rsiUP": Memory.isRSIup_draft(normalized[1], row[0], 60),
+                    "normalized_volume": None,
+                    "scaled_volume": None,
+                    "minmax_volume": None,
+                    "coef": None
+                }
+            print("fetched 15m data")
 
             async with self.lock:
 

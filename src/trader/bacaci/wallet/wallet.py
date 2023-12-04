@@ -1,6 +1,7 @@
 import os
 import json
 from datetime import datetime, timedelta
+from binance.client import Client
 
 from ..accounts.binance import Binance
 #from ..accounts.alpaca import Alpaca
@@ -47,6 +48,7 @@ class Wallet:
             'Close': 0,
             'DateClose': None,
             'Profit': 0,
+            'Percent': 0,
             'Balance': int(Parameters.CAPITAL.value),
             'Duration': None,
             'IsOpen': False,
@@ -143,7 +145,7 @@ class Wallet:
         with open(f"orders_{self.SYMBOL}.json", "w") as wallet:
             wallet.write(json.dumps(self.orders))
 
-    def open_position(self, side, quantity, price, date, key=None):
+    def open_position(self, side, quantity, price, date, type=Client.FUTURE_ORDER_TYPE_MARKET, key=None):
 
         # check if wallet is open, if not open it
         if not key is None:
@@ -161,7 +163,10 @@ class Wallet:
 
         else:
             if self.API == Parameters.BINANCE.value:
-                self.binance.futures_open_position(self.SYMBOL, side, quantity, price)
+                if type == Client.FUTURE_ORDER_TYPE_MARKET:
+                    self.binance.futures_open_position(self.SYMBOL, side, quantity)
+                elif type == Client.FUTURE_ORDER_TYPE_LIMIT:
+                    self.binance.futures_open_position(self.SYMBOL, side, quantity, price=price, type=type)
 
             elif self.API == Parameters.ALPACA.value:
                 self.alpaca.open_position(self.SYMBOL, side, quantity)
@@ -174,24 +179,33 @@ class Wallet:
             'Side': side,
             'Open': price,
             'DateOpen': date,
-            'Quantity': quantity,
-            'Commission_open': Parameters.COMMISSION.value,
-            'Commission_close': Parameters.COMMISSION.value,
+            'Quantity': quantity, # kaldıraçlı işlem hacmi
+            'Commission_open': None,
+            'Commission_close': None,
             'Close': None,
             'DateClose': None,
             'Profit': None,
+            'Percent': None,
             'Balance': self.orders[self.INDEX - 1]['Balance'], # calculate balance
             'Duration': None,
             'IsOpen': True,
             'NOT': None
         }
 
+        if self.API == Parameters.BINANCE.value:
+            self.orders[self.INDEX]['Commission_open'] = self.orders[self.INDEX]['Open'] * float(self.orders[self.INDEX]['Quantity']) * float(Parameters.COMMISSION.value) / 100
+
+        elif self.API == Parameters.IB.value:
+            self.orders[self.INDEX]['Commission_open'] = Parameters.COMMISSION.value
+
+        self.orders[self.INDEX]['Balance'] = self.orders[self.INDEX - 1]['Balance'] - self.orders[self.INDEX]['Commission_open']
+
         # save orders to json
         #self.save_orders_to_json()
 
         return self.orders
 
-    def close_position(self, side, quantity, price, date, key=None):
+    def close_position(self, side, quantity, price, date, type=Client.FUTURE_ORDER_TYPE_MARKET, key=None):
 
         # process
         if self.TEST_MODE:
@@ -199,7 +213,10 @@ class Wallet:
 
         else:
             if self.API == Parameters.BINANCE.value:
-                self.binance.futures_close_position(self.SYMBOL, side, quantity, price)
+                if type == Client.FUTURE_ORDER_TYPE_MARKET:
+                    self.binance.futures_close_position(self.SYMBOL, side, quantity)
+                elif type == Client.FUTURE_ORDER_TYPE_LIMIT:
+                    self.binance.futures_close_position(self.SYMBOL, side, quantity, price=price, type=type)
 
             elif self.API == Parameters.ALPACA.value:
                 self.alpaca.close_position(self.SYMBOL, side, quantity)
@@ -212,12 +229,20 @@ class Wallet:
         self.orders[self.INDEX]['IsOpen'] = False
         #self.orders[self.INDEX]['Duration'] = str(int((datetime.strptime(date, '%Y-%m-%d %H:%M:%S') - datetime.strptime(self.orders[self.INDEX]['DateOpen'], '%Y-%m-%d %H:%M:%S')).total_seconds() / 60))+'min'
 
-        if self.orders[self.INDEX]['Side'] == Parameters.TYPE_LONG.value:
-            self.orders[self.INDEX]['Profit'] = (self.orders[self.INDEX]['Close'] - self.orders[self.INDEX]['Open']) * float(self.orders[self.INDEX]['Quantity']) * int(Parameters.INDEX_POINT.value) - 2 * float(Parameters.COMMISSION.value)
-        elif self.orders[self.INDEX]['Side'] == Parameters.TYPE_SHORT.value:
-            self.orders[self.INDEX]['Profit'] = (self.orders[self.INDEX]['Open'] - self.orders[self.INDEX]['Close']) * float(self.orders[self.INDEX]['Quantity']) * int(Parameters.INDEX_POINT.value) - 2 * float(Parameters.COMMISSION.value)
+        if self.API == Parameters.BINANCE.value:
+            self.orders[self.INDEX]['Commission_close'] = self.orders[self.INDEX]['Close'] * float(self.orders[self.INDEX]['Quantity']) * float(Parameters.COMMISSION.value) / 100
 
-        self.orders[self.INDEX]['Balance'] = self.orders[self.INDEX - 1]['Balance'] + self.orders[self.INDEX]['Profit']
+        elif self.API == Parameters.IB.value:
+            self.orders[self.INDEX]['Commission_close'] = Parameters.COMMISSION.value
+
+        if self.orders[self.INDEX]['Side'] == Parameters.TYPE_LONG.value:
+            self.orders[self.INDEX]['Profit'] = (self.orders[self.INDEX]['Close'] - self.orders[self.INDEX]['Open']) * float(self.orders[self.INDEX]['Quantity'])
+
+        elif self.orders[self.INDEX]['Side'] == Parameters.TYPE_SHORT.value:
+            self.orders[self.INDEX]['Profit'] = (self.orders[self.INDEX]['Open'] - self.orders[self.INDEX]['Close']) * float(self.orders[self.INDEX]['Quantity'])
+
+        self.orders[self.INDEX]['Percent'] = self.orders[self.INDEX]['Profit'] / (float(self.orders[self.INDEX]['Quantity']) * self.orders[self.INDEX]['Close'])
+        self.orders[self.INDEX]['Balance'] = self.orders[self.INDEX - 1]['Balance'] + self.orders[self.INDEX]['Profit'] - (self.orders[self.INDEX]['Commission_open'] + self.orders[self.INDEX]['Commission_close'])
 
         # save orders to json
         #self.save_orders_to_json()
