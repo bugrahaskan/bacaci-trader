@@ -30,7 +30,8 @@ setup(
         'ibapi',
         'blpapi',
         'alpaca',
-        'flask'
+        'flask',
+        'openpyxl'
     ],
     python_requires='>=3.8',
     license='The MIT License (MIT)'

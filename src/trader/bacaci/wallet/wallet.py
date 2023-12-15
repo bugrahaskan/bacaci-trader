@@ -52,7 +52,9 @@ class Wallet:
             'Balance': int(Parameters.CAPITAL.value),
             'Duration': None,
             'IsOpen': False,
-            'NOT': None
+            'NOT': None,
+            'IdOpen': None,
+            'IdClose': None
         }
         
         for file in os.listdir(os.getcwd()):
@@ -164,9 +166,9 @@ class Wallet:
         else:
             if self.API == Parameters.BINANCE.value:
                 if type == Client.FUTURE_ORDER_TYPE_MARKET:
-                    self.binance.futures_open_position(self.SYMBOL, side, quantity)
+                    ord = self.binance.futures_open_position(self.SYMBOL, side, quantity)
                 elif type == Client.FUTURE_ORDER_TYPE_LIMIT:
-                    self.binance.futures_open_position(self.SYMBOL, side, quantity, price=price, type=type)
+                    ord = self.binance.futures_open_position(self.SYMBOL, side, quantity, price=price, type=type)
 
             elif self.API == Parameters.ALPACA.value:
                 self.alpaca.open_position(self.SYMBOL, side, quantity)
@@ -174,23 +176,50 @@ class Wallet:
             elif self.API == Parameters.IB.value:
                 pass
 
-        self.orders[self.INDEX] = {
-            'Symbol': self.SYMBOL,
-            'Side': side,
-            'Open': price,
-            'DateOpen': date,
-            'Quantity': quantity, # kaldıraçlı işlem hacmi
-            'Commission_open': None,
-            'Commission_close': None,
-            'Close': None,
-            'DateClose': None,
-            'Profit': None,
-            'Percent': None,
-            'Balance': self.orders[self.INDEX - 1]['Balance'], # calculate balance
-            'Duration': None,
-            'IsOpen': True,
-            'NOT': None
-        }
+
+        if self.TEST_MODE:
+            self.orders[self.INDEX] = {
+                'Symbol': self.SYMBOL,
+                'Side': side,
+                'Open': price,
+                'DateOpen': date,
+                'Quantity': quantity, # kaldıraçlı işlem hacmi
+                'Commission_open': None,
+                'Commission_close': None,
+                'Close': None,
+                'DateClose': None,
+                'Profit': None,
+                'Percent': None,
+                'Balance': self.orders[self.INDEX - 1]['Balance'], # calculate balance
+                'Duration': None,
+                'IsOpen': True,
+                'NOT': None,
+                'IdOpen': None, # in trade mode only
+                'IdClose': None
+            }
+
+        else:
+            #self.binance.client.futures_get_order(symbol=ord['Symbol'], orderId=ord['OrderID'])
+
+            self.orders[self.INDEX] = {
+                'Symbol': self.SYMBOL,
+                'Side': side,
+                'Open': price,
+                'DateOpen': date,
+                'Quantity': quantity, # kaldıraçlı işlem hacmi
+                'Commission_open': None,
+                'Commission_close': None,
+                'Close': None,
+                'DateClose': None,
+                'Profit': None,
+                'Percent': None,
+                'Balance': self.orders[self.INDEX - 1]['Balance'], # calculate balance
+                'Duration': None,
+                'IsOpen': True,
+                'NOT': None,
+                'IdOpen': ord['OrderID'], # in trade mode only
+                'IdClose': None
+            }
 
         if self.API == Parameters.BINANCE.value:
             self.orders[self.INDEX]['Commission_open'] = self.orders[self.INDEX]['Open'] * float(self.orders[self.INDEX]['Quantity']) * float(Parameters.COMMISSION.value) / 100
@@ -214,9 +243,9 @@ class Wallet:
         else:
             if self.API == Parameters.BINANCE.value:
                 if type == Client.FUTURE_ORDER_TYPE_MARKET:
-                    self.binance.futures_close_position(self.SYMBOL, side, quantity)
+                    ord = self.binance.futures_close_position(self.SYMBOL, side, quantity)
                 elif type == Client.FUTURE_ORDER_TYPE_LIMIT:
-                    self.binance.futures_close_position(self.SYMBOL, side, quantity, price=price, type=type)
+                    ord = self.binance.futures_close_position(self.SYMBOL, side, quantity, price=price, type=type)
 
             elif self.API == Parameters.ALPACA.value:
                 self.alpaca.close_position(self.SYMBOL, side, quantity)
@@ -228,6 +257,11 @@ class Wallet:
         self.orders[self.INDEX]['DateClose'] = date
         self.orders[self.INDEX]['IsOpen'] = False
         #self.orders[self.INDEX]['Duration'] = str(int((datetime.strptime(date, '%Y-%m-%d %H:%M:%S') - datetime.strptime(self.orders[self.INDEX]['DateOpen'], '%Y-%m-%d %H:%M:%S')).total_seconds() / 60))+'min'
+        
+        if self.TEST_MODE:
+            self.orders[self.INDEX]['IdClose'] = None
+        else:
+            self.orders[self.INDEX]['IdClose'] = ord['OrderID']
 
         if self.API == Parameters.BINANCE.value:
             self.orders[self.INDEX]['Commission_close'] = self.orders[self.INDEX]['Close'] * float(self.orders[self.INDEX]['Quantity']) * float(Parameters.COMMISSION.value) / 100

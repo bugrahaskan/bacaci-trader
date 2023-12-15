@@ -1,4 +1,4 @@
-#from binance import Client
+from binance import Client
 from binance.enums import HistoricalKlinesType
 from binance import AsyncClient, BinanceSocketManager
 import pandas as pd
@@ -232,6 +232,11 @@ class Data:
 
     async def data(self, symbol, interval):
         client = await AsyncClient.create()
+        #client = Client(
+        #    api_key=Parameters.BINANCE_API_KEY.value,
+        #    api_secret=Parameters.BINANCE_SECRET_KEY.value,
+        #    tld='futures'
+        #    )
         bm = BinanceSocketManager(client)
         
         # start any sockets here, i.e a trade socket

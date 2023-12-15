@@ -36,6 +36,9 @@ class Strategy:
 
         self.lock = asyncio.Lock()
 
+        global event
+        event = asyncio.Event()
+
         #try:
         #    self.mail = Notification()
         #    print("Succesfully connected to SMTP")
@@ -50,7 +53,7 @@ class Strategy:
         loop.run_until_complete(
             asyncio.gather(
                 self.memory.mem(),
-                self.dummy_strategy()
+                self.strategy_2_DEV()
             )
         )
 
@@ -83,6 +86,85 @@ class Strategy:
         else:
             return False
 
+    async def check_event(self, event: asyncio.Event, t=10):
+
+        while True:
+
+            await asyncio.sleep(t)
+
+            data = self.read_memory()
+
+            if data["current_state"]["rsi-5m"] < 68:
+                event.set()
+                break
+
+    async def check_event_is_order_filled(self, event: asyncio.Event, t=10):
+
+        while True:
+
+            await asyncio.sleep(t)
+
+            if self.TEST_MODE:
+                event.set()
+                break
+
+            else:
+                if self.wallet.binance.client.futures_get_order(
+                                                symbol=self.wallet.orders[self.wallet.INDEX]['Symbol'],
+                                                orderId=self.wallet.orders[self.wallet.INDEX]['IdOpen']
+                                                )['status'] == 'FILLED':
+                    event.set()
+                    break
+
+    async def check_event_reset_conditions(self, event: asyncio.Event, t=10):
+
+        while True:
+
+            data = self.read_memory()
+
+            await asyncio.sleep(t)
+
+            if self.TEST_MODE:
+                event.set()
+                break
+
+            else:
+                if self.wallet.orders[self.wallet.INDEX]["Side"] == Parameters.TYPE_LONG.value:
+                    if not data["current_state"]["rsi-5m"] < (30 + 3.):
+                        event.set()
+                        break
+
+                if self.wallet.orders[self.wallet.INDEX]["Side"] == Parameters.TYPE_SHORT.value:
+                    if not data["current_state"]["rsi-5m"] > (70 - 3.):
+                        event.set()
+                        break
+
+    async def generate_event(self, event: asyncio.Event):
+
+        i = 0
+
+        while True:
+
+            await asyncio.sleep(1)
+
+            i += 1
+            print(f"i is now {i}.")
+
+            if i == 15:
+                event.set()
+                print("event set True.")
+                break
+
+    async def print_statement(self):
+
+        while True:
+
+            await asyncio.sleep(1)
+
+            data = self.read_memory()
+
+            print("actual RSI", data["current_state"]["rsi-5m"])
+
     async def test(self):
 
         while True:
@@ -94,12 +176,33 @@ class Strategy:
 
             print("RSI 1m", data["historical_prices"]["1m"][last_key_1m]["rsi"])
             print("RSI 5m", data["historical_prices"]["5m"][last_key_5m]["rsi"])
+            print("realtime RSI 5m", data["current_state"]["rsi-5m"])
 
-            await self.check_conditions(
+            '''await self.check_conditions(
                 cond=all([
                     abs(data["current_state"]["rsi-1m"] - 50) < 10
                 ])
+            )'''
+
+            #event = asyncio.Event()
+
+            '''await asyncio.gather(
+                event.wait(),
+                self.generate_event(event=event)
+            )'''
+
+            await asyncio.gather(
+                event.wait(),
+                self.check_event(
+                    event=event,
+                    t=1
+                    )
             )
+
+            event.clear()
+
+
+            print("it is OK.")
 
     async def dummy_strategy(self, cond=False):
         # WORKING ON STOP_LOSS
@@ -111,6 +214,10 @@ class Strategy:
             last_key = list(data["historical_prices"]["1m"].keys())[-1]
             last_key_1s = list(data["historical_prices"]["1s"].keys())[-1]
 
+            global event
+
+            print("actual price:", data["historical_prices"]["1s"][last_key_1s]["c"])
+
             if not self.wallet.is_open():
                 time.sleep(5)
                 print("Waiting to open position", Data.to_datetime(data["current_date"]))
@@ -119,14 +226,37 @@ class Strategy:
                     side="BUY",
                     quantity=self.qty,
                     price=data["historical_prices"]["1m"][last_key]["c"],
-                    date=Data.to_datetime(data["historical_prices"]["1m"][last_key]["t"]).strftime("%Y-%m-%d %H:%M:%S")
+                    date=Data.to_datetime(data["historical_prices"]["1m"][last_key]["t"]).strftime("%Y-%m-%d %H:%M:%S"),
+                    #type=Client.FUTURE_ORDER_TYPE_LIMIT
                 )
                 
                 stop_loss = StopLoss(max(data["historical_prices"]["1m"][last_key]["o"], data["historical_prices"]["1m"][last_key]["c"]) - 5.)
                 trailing_stop = MyTrailingStop(data["historical_prices"]["1m"][last_key]["c"] - 2.)
 
                 print(self.wallet.orders)
-                
+
+                #event = asyncio.Event()
+                await asyncio.gather(
+                    event.wait(),
+                    self.check_event_is_order_filled(
+                        event=event,
+                        t=1
+                    )
+                )
+                event.clear()
+
+                '''await self.check_conditions(
+                    cond=all(
+                        [
+                            self.wallet.binance.client.futures_get_order(
+                                symbol=self.wallet.orders[self.wallet.INDEX]['Symbol'],
+                                orderId=self.wallet.orders[self.wallet.INDEX]['IdOpen']
+                                ) == 'FILLED'
+                        ]
+                    ),
+                    t=1
+                )'''
+
                 pass
 
             elif self.wallet.is_open():
@@ -180,8 +310,19 @@ class Strategy:
                             side="SELL",
                             quantity=self.qty,
                             price=data["historical_prices"]["1m"][last_key]["c"],
-                            date=data["historical_prices"]["1m"][last_key]["t"]
+                            date=Data.to_datetime(data["historical_prices"]["1m"][last_key]["t"]).strftime("%Y-%m-%d %H:%M:%S"),
+                            #type=Client.FUTURE_ORDER_TYPE_LIMIT
                         )
+
+                        await asyncio.gather(
+                            event.wait(),
+                            self.check_event_is_order_filled(
+                                event=event,
+                                t=1
+                            )
+                        )
+                        event.clear()
+                        
                         print(self.wallet.orders)
                         
                     elif resp1:
@@ -191,8 +332,19 @@ class Strategy:
                             side="SELL",
                             quantity=self.qty,
                             price=data["historical_prices"]["1m"][last_key]["c"],
-                            date=data["historical_prices"]["1m"][last_key]["t"]
+                            date=Data.to_datetime(data["historical_prices"]["1m"][last_key]["t"]).strftime("%Y-%m-%d %H:%M:%S"),
+                            #type=Client.FUTURE_ORDER_TYPE_LIMIT
                         )
+
+                        await asyncio.gather(
+                            event.wait(),
+                            self.check_event_is_order_filled(
+                                event=event,
+                                t=1
+                            )
+                        )
+                        event.clear()
+                        
                         print(self.wallet.orders)
 
                 elif self.wallet.orders[self.wallet.INDEX]["Side"] == Parameters.TYPE_SHORT.value:
@@ -1050,6 +1202,8 @@ class Strategy:
                 list(data["historical_prices"]["5m"].keys())[-i] for i in range(1,10)
             ]
 
+            global event
+
             #with open("rsi_output.csv", "a") as r:
             #    d = "{},{:.{}f}\n".format(Data.to_datetime(data["current_date"]), data["historical_prices"]["5m"][last_key_5m]["rsi"], 2)
             #    r.write(d)
@@ -1062,6 +1216,7 @@ class Strategy:
                 #print("5m RSI:", data["historical_prices"]["5m"][last_key_5m]["rsi"])
                 print("realtime 5m RSI:", data["current_state"]["rsi-5m"])
                 print("normalized volume 1m:", data["historical_prices"]["1m"][last_key_1m]["normalized_volume"])
+                print("normalized volume 5m:", data["historical_prices"]["5m"][last_key_5m]["normalized_volume"])
 
                 resp1, resp2 = await asyncio.gather(
                     self.check_conditions(
@@ -1105,6 +1260,27 @@ class Strategy:
                         #type=Client.FUTURE_ORDER_TYPE_LIMIT
                     )
 
+                    '''await self.check_conditions(
+                        cond=all(
+                            [
+                                self.wallet.binance.client.futures_get_order(
+                                    symbol=self.wallet.orders[self.wallet.INDEX]['Symbol'],
+                                    orderId=self.wallet.orders[self.wallet.INDEX]['IdOpen']
+                                    ) == 'FILLED'
+                            ]
+                        ),
+                        t=1
+                    )'''
+                
+                    await asyncio.gather(
+                        event.wait(),
+                        self.check_event_is_order_filled(
+                            event=event,
+                            t=1
+                        )
+                    )
+                    event.clear()
+
                     stop_loss = StopLoss(max(data["historical_prices"]["1m"][last_key_1m]["o"], data["historical_prices"]["1m"][last_key_1m]["c"]) + 5.)
                     take_profit = TakeProfit(data["historical_prices"]["1m"][last_key_1m]["c"] - 9.)
 
@@ -1129,6 +1305,15 @@ class Strategy:
                         date=Data.to_datetime(data["historical_prices"]["1m"][last_key_1m]["t"]).strftime("%Y-%m-%d %H:%M:%S")
                         #type=Client.FUTURE_ORDER_TYPE_LIMIT
                     )
+                
+                    await asyncio.gather(
+                        event.wait(),
+                        self.check_event_is_order_filled(
+                            event=event,
+                            t=1
+                        )
+                    )
+                    event.clear()
 
                     stop_loss = StopLoss(min(data["historical_prices"]["1m"][last_key_1m]["o"], data["historical_prices"]["1m"][last_key_1m]["c"]) - 5.)
                     take_profit = TakeProfit(data["historical_prices"]["1m"][last_key_1m]["c"] + 9.)
@@ -1146,6 +1331,14 @@ class Strategy:
                 print("1m RSI:", data["historical_prices"]["1m"][last_key_1m]["rsi"])
                 print("5m RSI:", data["historical_prices"]["5m"][last_key_5m]["rsi"])
 
+                # Calculate PNL %
+                if self.wallet.orders[self.wallet.INDEX]["Side"] == Parameters.TYPE_LONG.value:
+                    profit_percent = 100 * (data["historical_prices"]["1s"][last_key_1s]["c"] - self.wallet.orders[self.wallet.INDEX]["Open"]) * float(Parameters.INDEX_POINT.value) / self.wallet.orders[self.wallet.INDEX]["Open"]
+                elif self.wallet.orders[self.wallet.INDEX]["Side"] == Parameters.TYPE_SHORT.value:
+                    profit_percent = 100 * (self.wallet.orders[self.wallet.INDEX]["Open"] - data["historical_prices"]["1s"][last_key_1s]["c"]) * float(Parameters.INDEX_POINT.value) / self.wallet.orders[self.wallet.INDEX]["Open"]
+
+                print("profit percent:", profit_percent)
+
                 if self.wallet.orders[self.wallet.INDEX]["Side"] == Parameters.TYPE_LONG.value:
                     
                     '''resp = await self.check_conditions(
@@ -1160,7 +1353,8 @@ class Strategy:
                         self.check_conditions(
                             cond=all(
                                 [
-                                    take_profit.check_trigger(data["historical_prices"]["1s"][last_key_1s]["c"], Parameters.TYPE_LONG.value) or abs(data["current_state"]["rsi-1m"] - 70) < 5.
+                                    #take_profit.check_trigger(data["historical_prices"]["1s"][last_key_1s]["c"], Parameters.TYPE_LONG.value) or abs(data["current_state"]["rsi-1m"] - 70) < 5.
+                                    profit_percent >= 9. / 20.
                                 ]
                             )
                         ),
@@ -1186,6 +1380,16 @@ class Strategy:
                             date=Data.to_datetime(data["historical_prices"]["1m"][last_key_1m]["t"]).strftime("%Y-%m-%d %H:%M:%S")
                             #type=Client.FUTURE_ORDER_TYPE_LIMIT
                         )
+
+                        await asyncio.gather(
+                            event.wait(),
+                            self.check_event_is_order_filled(
+                                event=event,
+                                t=1
+                            )
+                        )
+                        event.clear()
+                        
                         print(self.wallet.orders)
 
                         Notification("bhaskan@bacaciyatirim.com", json.dumps(self.wallet.orders[self.wallet.INDEX]))
@@ -1203,6 +1407,16 @@ class Strategy:
                             date=Data.to_datetime(data["historical_prices"]["1m"][last_key_1m]["t"]).strftime("%Y-%m-%d %H:%M:%S")
                             #type=Client.FUTURE_ORDER_TYPE_LIMIT
                         )
+
+                        await asyncio.gather(
+                            event.wait(),
+                            self.check_event_is_order_filled(
+                                event=event,
+                                t=1
+                            )
+                        )
+                        event.clear()
+
                         print(self.wallet.orders)
 
                         Notification("bhaskan@bacaciyatirim.com", json.dumps(self.wallet.orders[self.wallet.INDEX]))
@@ -1210,11 +1424,42 @@ class Strategy:
 
                         self.write_to_excel()
 
-                        await self.check_conditions(
+                        
+                        await asyncio.gather(
+                            event.wait(),
+                            self.check_event_reset_conditions(
+                                event=event,
+                                t=1
+                            )
+                        )
+                        event.clear()
+
+                        '''event2 = asyncio.Event()
+                        await asyncio.gather(
+                            event2.wait(),
+                            self.check_event(
+                                cond=all(
+                                            [
+                                                #not data["historical_prices"]["5m"][last_key_5m]["rsi"] < (30 + 3.)
+                                                not data["historical_prices"]["5m"][last_key_5m]["rsi"] < (50 + 3.)
+                                            ]
+                                        ),
+                                event=event2,
+                                t=5
+                            )
+                        )'''
+
+                        '''await self.check_conditions(
                             cond=all([
                                 abs(data["current_state"]["rsi-1m"] - 50) < 10
                             ])
-                        )
+                        )'''
+
+                        '''await self.check_conditions(
+                            cond=all([
+                                not data["historical_prices"]["5m"][last_key_5m]["rsi"] < (30 + 3.)
+                            ])
+                        )'''
 
                 elif self.wallet.orders[self.wallet.INDEX]["Side"] == Parameters.TYPE_SHORT.value:
                     
@@ -1230,7 +1475,8 @@ class Strategy:
                         self.check_conditions(
                             cond=all(
                                 [
-                                    take_profit.check_trigger(data["historical_prices"]["1s"][last_key_1s]["c"], Parameters.TYPE_SHORT.value) or abs(data["current_state"]["rsi-1m"] - 30) < 5.
+                                    #take_profit.check_trigger(data["historical_prices"]["1s"][last_key_1s]["c"], Parameters.TYPE_SHORT.value) or abs(data["current_state"]["rsi-1m"] - 30) < 5.
+                                    profit_percent >= 9. / 20.
                                 ]
                             )
                         ),
@@ -1256,6 +1502,16 @@ class Strategy:
                             date=Data.to_datetime(data["historical_prices"]["1m"][last_key_1m]["t"]).strftime("%Y-%m-%d %H:%M:%S")
                             #type=Client.FUTURE_ORDER_TYPE_LIMIT
                         )
+
+                        await asyncio.gather(
+                            event.wait(),
+                            self.check_event_is_order_filled(
+                                event=event,
+                                t=1
+                            )
+                        )
+                        event.clear()
+
                         print(self.wallet.orders)
 
                         Notification("bhaskan@bacaciyatirim.com", json.dumps(self.wallet.orders[self.wallet.INDEX]))
@@ -1273,6 +1529,16 @@ class Strategy:
                             date=Data.to_datetime(data["historical_prices"]["1m"][last_key_1m]["t"]).strftime("%Y-%m-%d %H:%M:%S")
                             #type=Client.FUTURE_ORDER_TYPE_LIMIT
                         )
+
+                        await asyncio.gather(
+                            event.wait(),
+                            self.check_event_is_order_filled(
+                                event=event,
+                                t=1
+                            )
+                        )
+                        event.clear()
+
                         print(self.wallet.orders)
 
                         Notification("bhaskan@bacaciyatirim.com", json.dumps(self.wallet.orders[self.wallet.INDEX]))
@@ -1280,11 +1546,41 @@ class Strategy:
 
                         self.write_to_excel()
 
-                        await self.check_conditions(
+                        await asyncio.gather(
+                            event.wait(),
+                            self.check_event_reset_conditions(
+                                event=event,
+                                t=1
+                            )
+                        )
+                        event.clear()
+
+                        '''event2 = asyncio.Event()
+                        await asyncio.gather(
+                            event2.wait(),
+                            self.check_event(
+                                cond=all(
+                                            [
+                                                #not data["historical_prices"]["5m"][last_key_5m]["rsi"] > (70 - 3.)
+                                                not data["historical_prices"]["5m"][last_key_5m]["rsi"] > (50 - 3.)
+                                            ]
+                                        ),
+                                event=event2,
+                                t=5
+                            )
+                        )'''
+
+                        '''await self.check_conditions(
                             cond=all([
                                 abs(data["current_state"]["rsi-1m"] - 50) < 10
                             ])
-                        )
+                        )'''
+
+                        '''await self.check_conditions(
+                            cond=all([
+                                not data["historical_prices"]["5m"][last_key_5m]["rsi"] > (70 - 3.)
+                            ])
+                        )'''
 
             with open(f"log.json", "w") as log:
                 log.write(json.dumps(self.wallet.orders))
@@ -1311,6 +1607,8 @@ class Strategy:
             last_keys_15m = [
                 list(data["historical_prices"]["15m"].keys())[-i] for i in range(1,10)
             ]
+
+            global event
 
             #with open("rsi_output.csv", "a") as r:
             #    d = "{},{:.{}f}\n".format(Data.to_datetime(data["current_date"]), data["historical_prices"]["5m"][last_key_5m]["rsi"], 2)
@@ -1356,11 +1654,26 @@ class Strategy:
                     print("15m RSI:", data["historical_prices"]["15m"][last_key_15m]["rsi"])
                     print(data["current_state"]["rsi-15m"])
 
-                    await self.check_conditions(
-                            cond=all([
-                                data["current_state"]["rsi-15m"] - data["historical_prices"]["15m"][last_key_15m]["rsi"] < 0.
-                            ])
+                    # to correct:
+                    event0 = asyncio.Event()
+                    await asyncio.gather(
+                        event0.wait(),
+                        self.check_event(
+                            cond=all(
+                                        [
+                                            data["current_state"]["rsi-15m"] - data["historical_prices"]["15m"][last_key_15m]["rsi"] < 0.
+                                        ]
+                                    ),
+                            event=event0,
+                            t=1
                         )
+                    )
+
+                    '''await self.check_conditions(
+                            cond=all([
+                                data["current_state"]["rsi-5m"] - data["historical_prices"]["5m"][last_key_5m]["rsi"] < 0.
+                            ])
+                        )'''
 
                     # open position...
                     self.wallet.open_position(
@@ -1369,6 +1682,23 @@ class Strategy:
                         price=data["historical_prices"]["1s"][last_key_1s]["c"],
                         date=Data.to_datetime(data["historical_prices"]["1s"][last_key_1s]["t"]).strftime("%Y-%m-%d %H:%M:%S")
                         #type=Client.FUTURE_ORDER_TYPE_LIMIT
+                    )
+
+                    event = asyncio.Event()
+                    await asyncio.gather(
+                        event.wait(),
+                        self.check_event(
+                            cond=all(
+                                        [
+                                            self.wallet.binance.client.futures_get_order(
+                                                symbol=self.wallet.orders[self.wallet.INDEX]['Symbol'],
+                                                orderId=self.wallet.orders[self.wallet.INDEX]['IdOpen']
+                                                )['status'] == 'FILLED'
+                                        ]
+                                    ),
+                            event=event,
+                            t=1
+                        )
                     )
 
                     stop_loss = StopLoss(max(data["historical_prices"]["1m"][last_key_1m]["o"], data["historical_prices"]["1m"][last_key_1m]["c"]) + 5.)
@@ -1386,11 +1716,26 @@ class Strategy:
                     print("15m RSI:", data["historical_prices"]["15m"][last_key_15m]["rsi"])
                     print(data["current_state"]["rsi-15m"])
 
-                    await self.check_conditions(
-                            cond=all([
-                                data["current_state"]["rsi-15m"] - data["historical_prices"]["15m"][last_key_15m]["rsi"] > 0.
-                            ])
+                    # to correct:
+                    event0 = asyncio.Event()
+                    await asyncio.gather(
+                        event0.wait(),
+                        self.check_event(
+                            cond=all(
+                                        [
+                                            data["current_state"]["rsi-15m"] - data["historical_prices"]["15m"][last_key_15m]["rsi"] < 0.
+                                        ]
+                                    ),
+                            event=event0,
+                            t=1
                         )
+                    )
+
+                    '''await self.check_conditions(
+                            cond=all([
+                                data["current_state"]["rsi-5m"] - data["historical_prices"]["5m"][last_key_5m]["rsi"] > 0.
+                            ])
+                        )'''
 
                     # open position...
                     self.wallet.open_position(
@@ -1399,6 +1744,23 @@ class Strategy:
                         price=data["historical_prices"]["1s"][last_key_1s]["c"],
                         date=Data.to_datetime(data["historical_prices"]["1s"][last_key_1s]["t"]).strftime("%Y-%m-%d %H:%M:%S")
                         #type=Client.FUTURE_ORDER_TYPE_LIMIT
+                    )
+
+                    event = asyncio.Event()
+                    await asyncio.gather(
+                        event.wait(),
+                        self.check_event(
+                            cond=all(
+                                        [
+                                            self.wallet.binance.client.futures_get_order(
+                                                symbol=self.wallet.orders[self.wallet.INDEX]['Symbol'],
+                                                orderId=self.wallet.orders[self.wallet.INDEX]['IdOpen']
+                                                )['status'] == 'FILLED'
+                                        ]
+                                    ),
+                            event=event,
+                            t=1
+                        )
                     )
 
                     stop_loss = StopLoss(min(data["historical_prices"]["1m"][last_key_1m]["o"], data["historical_prices"]["1m"][last_key_1m]["c"]) - 5.)
@@ -1439,7 +1801,7 @@ class Strategy:
                                 [
                                     #abs(data["historical_prices"]["1m"][last_key_1m]["rsi"] - 70) < 2.
                                     #data["current_state"]["rsi-5m"] > (70 - 4.)
-                                    profit_percent >= 9.
+                                    profit_percent >= 9. / 20.
                                 ]
                             )
                         ),
@@ -1465,6 +1827,24 @@ class Strategy:
                             date=Data.to_datetime(data["historical_prices"]["1s"][last_key_1s]["t"]).strftime("%Y-%m-%d %H:%M:%S")
                             #type=Client.FUTURE_ORDER_TYPE_LIMIT
                         )
+
+                        event = asyncio.Event()
+                        await asyncio.gather(
+                            event.wait(),
+                            self.check_event(
+                                cond=all(
+                                            [
+                                                self.wallet.binance.client.futures_get_order(
+                                                    symbol=self.wallet.orders[self.wallet.INDEX]['Symbol'],
+                                                    orderId=self.wallet.orders[self.wallet.INDEX]['IdOpen']
+                                                    )['status'] == 'FILLED'
+                                            ]
+                                        ),
+                                event=event,
+                                t=1
+                            )
+                        )
+                        
                         print(self.wallet.orders)
 
                         #Notification("bhaskan@bacaciyatirim.com", json.dumps(self.wallet.orders[self.wallet.INDEX]))
@@ -1482,6 +1862,24 @@ class Strategy:
                             date=Data.to_datetime(data["historical_prices"]["1s"][last_key_1s]["t"]).strftime("%Y-%m-%d %H:%M:%S")
                             #type=Client.FUTURE_ORDER_TYPE_LIMIT
                         )
+
+                        event = asyncio.Event()
+                        await asyncio.gather(
+                            event.wait(),
+                            self.check_event(
+                                cond=all(
+                                            [
+                                                self.wallet.binance.client.futures_get_order(
+                                                    symbol=self.wallet.orders[self.wallet.INDEX]['Symbol'],
+                                                    orderId=self.wallet.orders[self.wallet.INDEX]['IdOpen']
+                                                    )['status'] == 'FILLED'
+                                            ]
+                                        ),
+                                event=event,
+                                t=1
+                            )
+                        )
+
                         print(self.wallet.orders)
 
                         #Notification("bhaskan@bacaciyatirim.com", json.dumps(self.wallet.orders[self.wallet.INDEX]))
@@ -1489,11 +1887,25 @@ class Strategy:
 
                         self.write_to_excel()
 
-                        await self.check_conditions(
+                        event2 = asyncio.Event()
+                        await asyncio.gather(
+                            event2.wait(),
+                            self.check_event(
+                                cond=all(
+                                            [
+                                                not data["historical_prices"]["15m"][last_key_15m]["rsi"] < (30 + 3.)
+                                            ]
+                                        ),
+                                event=event2,
+                                t=5
+                            )
+                        )
+
+                        '''await self.check_conditions(
                             cond=all([
                                 not data["historical_prices"]["15m"][last_key_15m]["rsi"] < (30 + 3.)
                             ])
-                        )
+                        )'''
 
                 elif self.wallet.orders[self.wallet.INDEX]["Side"] == Parameters.TYPE_SHORT.value:
                     
@@ -1511,7 +1923,7 @@ class Strategy:
                                 [
                                     #abs(data["historical_prices"]["5m"][last_key_5m]["rsi"] - 30) < 5.
                                     #data["current_state"]["rsi-5m"] < (30 + 4.)
-                                    profit_percent >= 9.
+                                    profit_percent >= 9. / 20.
                                 ]
                             )
                         ),
@@ -1537,6 +1949,24 @@ class Strategy:
                             date=Data.to_datetime(data["historical_prices"]["1s"][last_key_1s]["t"]).strftime("%Y-%m-%d %H:%M:%S")
                             #type=Client.FUTURE_ORDER_TYPE_LIMIT
                         )
+
+                        event = asyncio.Event()
+                        await asyncio.gather(
+                            event.wait(),
+                            self.check_event(
+                                cond=all(
+                                            [
+                                                self.wallet.binance.client.futures_get_order(
+                                                    symbol=self.wallet.orders[self.wallet.INDEX]['Symbol'],
+                                                    orderId=self.wallet.orders[self.wallet.INDEX]['IdOpen']
+                                                    )['status'] == 'FILLED'
+                                            ]
+                                        ),
+                                event=event,
+                                t=1
+                            )
+                        )
+
                         print(self.wallet.orders)
 
                         #Notification("bhaskan@bacaciyatirim.com", json.dumps(self.wallet.orders[self.wallet.INDEX]))
@@ -1554,6 +1984,24 @@ class Strategy:
                             date=Data.to_datetime(data["historical_prices"]["1s"][last_key_1s]["t"]).strftime("%Y-%m-%d %H:%M:%S")
                             #type=Client.FUTURE_ORDER_TYPE_LIMIT
                         )
+
+                        event = asyncio.Event()
+                        await asyncio.gather(
+                            event.wait(),
+                            self.check_event(
+                                cond=all(
+                                            [
+                                                self.wallet.binance.client.futures_get_order(
+                                                    symbol=self.wallet.orders[self.wallet.INDEX]['Symbol'],
+                                                    orderId=self.wallet.orders[self.wallet.INDEX]['IdOpen']
+                                                    )['status'] == 'FILLED'
+                                            ]
+                                        ),
+                                event=event,
+                                t=1
+                            )
+                        )
+
                         print(self.wallet.orders)
 
                         #Notification("bhaskan@bacaciyatirim.com", json.dumps(self.wallet.orders[self.wallet.INDEX]))
@@ -1561,11 +2009,25 @@ class Strategy:
 
                         self.write_to_excel()
 
-                        await self.check_conditions(
+                        event2 = asyncio.Event()
+                        await asyncio.gather(
+                            event2.wait(),
+                            self.check_event(
+                                cond=all(
+                                            [
+                                                not data["historical_prices"]["15m"][last_key_15m]["rsi"] > (70 - 3.)
+                                            ]
+                                        ),
+                                event=event2,
+                                t=5
+                            )
+                        )
+
+                        '''await self.check_conditions(
                             cond=all([
                                 not data["historical_prices"]["15m"][last_key_15m]["rsi"] > (70 - 3.)
                             ])
-                        )
+                        )'''
 
             with open(f"log.json", "w") as log:
                 log.write(json.dumps(self.wallet.orders))

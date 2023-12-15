@@ -154,7 +154,7 @@ class Memory:
                 #np.append(grouped_sums_5m, group_sum)
             
             grouped_sums_1m_array = np.array(grouped_sums_1m)
-            grouped_sums_5m_array = np.array(grouped_sums_5m)
+            grouped_sums_5m_array = np.array([None] * 80 + grouped_sums_5m) # astuce
 
             # real-time(intrabar) RSI with pandas_ta:
             '''rsi = [
@@ -184,10 +184,10 @@ class Memory:
 
             normalized_data = [
                 pd.DataFrame(Memory.normalize_data(rsi[0]["volume"].iloc[-9:].values), columns=['normalized_volume']),
-                #pd.DataFrame(Memory.normalize_data(grouped_sums_1m_array), columns=['normalized_volume']),
-                #pd.DataFrame(Memory.normalize_data(grouped_sums_5m_array), columns=['normalized_volume'])
-                pd.DataFrame(Memory.normalize_data(rsi[1]["volume"].values[:-1]), columns=['normalized_volume']),
-                pd.DataFrame(Memory.normalize_data(rsi[2]["volume"].values[:-1]), columns=['normalized_volume']),
+                pd.DataFrame(Memory.normalize_data(grouped_sums_1m_array), columns=['normalized_volume']),
+                pd.DataFrame(Memory.normalize_data(grouped_sums_5m_array), columns=['normalized_volume']),
+                #pd.DataFrame(Memory.normalize_data(rsi[1]["volume"].values[:-1]), columns=['normalized_volume']),
+                #pd.DataFrame(Memory.normalize_data(rsi[2]["volume"].values[:-1]), columns=['normalized_volume']),
                 pd.DataFrame()
             ]
 
