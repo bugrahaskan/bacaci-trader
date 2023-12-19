@@ -116,7 +116,7 @@ class Strategy:
                     event.set()
                     break
 
-    async def check_event_reset_conditions(self, event: asyncio.Event, t=10):
+    async def check_event_reset_conditions(self, event: asyncio.Event, interval="5m",  t=10):
 
         while True:
 
@@ -124,20 +124,34 @@ class Strategy:
 
             await asyncio.sleep(t)
 
-            if self.TEST_MODE:
-                event.set()
-                break
+            if self.wallet.orders[self.wallet.INDEX]["Side"] == Parameters.TYPE_LONG.value:
+                if not data["current_state"][f"rsi-{interval}"] < (30 + 3.):
+                    event.set()
+                    break
 
-            else:
-                if self.wallet.orders[self.wallet.INDEX]["Side"] == Parameters.TYPE_LONG.value:
-                    if not data["current_state"]["rsi-5m"] < (30 + 3.):
-                        event.set()
-                        break
+            elif self.wallet.orders[self.wallet.INDEX]["Side"] == Parameters.TYPE_SHORT.value:
+                if not data["current_state"][f"rsi-{interval}"] > (70 - 3.):
+                    event.set()
+                    break
+    
+    async def check_event_rsi_change(self, event: asyncio.Event, direction, interval="15m", t=10):
 
-                if self.wallet.orders[self.wallet.INDEX]["Side"] == Parameters.TYPE_SHORT.value:
-                    if not data["current_state"]["rsi-5m"] > (70 - 3.):
-                        event.set()
-                        break
+        while True:
+
+            data = self.read_memory()
+            last_key = list(data["historical_prices"][interval].keys())[-1]
+
+            await asyncio.sleep(t)
+
+            if direction == "down":
+                if data["current_state"][f"rsi-{interval}"] - data["historical_prices"][interval][last_key]["rsi"] < 0.:
+                    event.set()
+                    break
+            
+            elif direction == "up":
+                if data["current_state"][f"rsi-{interval}"] - data["historical_prices"][interval][last_key]["rsi"] > 0.:
+                    event.set()
+                    break
 
     async def generate_event(self, event: asyncio.Event):
 
@@ -1354,7 +1368,7 @@ class Strategy:
                             cond=all(
                                 [
                                     #take_profit.check_trigger(data["historical_prices"]["1s"][last_key_1s]["c"], Parameters.TYPE_LONG.value) or abs(data["current_state"]["rsi-1m"] - 70) < 5.
-                                    profit_percent >= 9. / 20.
+                                    profit_percent >= 9. # / 20.
                                 ]
                             )
                         ),
@@ -1424,7 +1438,6 @@ class Strategy:
 
                         self.write_to_excel()
 
-                        
                         await asyncio.gather(
                             event.wait(),
                             self.check_event_reset_conditions(
@@ -1476,7 +1489,7 @@ class Strategy:
                             cond=all(
                                 [
                                     #take_profit.check_trigger(data["historical_prices"]["1s"][last_key_1s]["c"], Parameters.TYPE_SHORT.value) or abs(data["current_state"]["rsi-1m"] - 30) < 5.
-                                    profit_percent >= 9. / 20.
+                                    profit_percent >= 9. # / 20.
                                 ]
                             )
                         ),
@@ -1655,7 +1668,7 @@ class Strategy:
                     print(data["current_state"]["rsi-15m"])
 
                     # to correct:
-                    event0 = asyncio.Event()
+                    '''event0 = asyncio.Event()
                     await asyncio.gather(
                         event0.wait(),
                         self.check_event(
@@ -1667,7 +1680,18 @@ class Strategy:
                             event=event0,
                             t=1
                         )
+                    )'''
+
+                    await asyncio.gather(
+                        event.wait(),
+                        self.check_event_rsi_change(
+                            event=event,
+                            direction="down",
+                            interval="15m",
+                            t=1
+                        )
                     )
+                    event.clear()
 
                     '''await self.check_conditions(
                             cond=all([
@@ -1684,22 +1708,14 @@ class Strategy:
                         #type=Client.FUTURE_ORDER_TYPE_LIMIT
                     )
 
-                    event = asyncio.Event()
                     await asyncio.gather(
                         event.wait(),
-                        self.check_event(
-                            cond=all(
-                                        [
-                                            self.wallet.binance.client.futures_get_order(
-                                                symbol=self.wallet.orders[self.wallet.INDEX]['Symbol'],
-                                                orderId=self.wallet.orders[self.wallet.INDEX]['IdOpen']
-                                                )['status'] == 'FILLED'
-                                        ]
-                                    ),
+                        self.check_event_is_order_filled(
                             event=event,
                             t=1
                         )
                     )
+                    event.clear()
 
                     stop_loss = StopLoss(max(data["historical_prices"]["1m"][last_key_1m]["o"], data["historical_prices"]["1m"][last_key_1m]["c"]) + 5.)
 
@@ -1717,19 +1733,30 @@ class Strategy:
                     print(data["current_state"]["rsi-15m"])
 
                     # to correct:
-                    event0 = asyncio.Event()
+                    '''event0 = asyncio.Event()
                     await asyncio.gather(
                         event0.wait(),
                         self.check_event(
                             cond=all(
                                         [
-                                            data["current_state"]["rsi-15m"] - data["historical_prices"]["15m"][last_key_15m]["rsi"] < 0.
+                                            data["current_state"]["rsi-15m"] - data["historical_prices"]["15m"][last_key_15m]["rsi"] > 0.
                                         ]
                                     ),
                             event=event0,
                             t=1
                         )
+                    )'''
+
+                    await asyncio.gather(
+                        event.wait(),
+                        self.check_event_rsi_change(
+                            event=event,
+                            direction="up",
+                            interval="15m",
+                            t=1
+                        )
                     )
+                    event.clear()
 
                     '''await self.check_conditions(
                             cond=all([
@@ -1746,22 +1773,14 @@ class Strategy:
                         #type=Client.FUTURE_ORDER_TYPE_LIMIT
                     )
 
-                    event = asyncio.Event()
                     await asyncio.gather(
                         event.wait(),
-                        self.check_event(
-                            cond=all(
-                                        [
-                                            self.wallet.binance.client.futures_get_order(
-                                                symbol=self.wallet.orders[self.wallet.INDEX]['Symbol'],
-                                                orderId=self.wallet.orders[self.wallet.INDEX]['IdOpen']
-                                                )['status'] == 'FILLED'
-                                        ]
-                                    ),
+                        self.check_event_is_order_filled(
                             event=event,
                             t=1
                         )
                     )
+                    event.clear()
 
                     stop_loss = StopLoss(min(data["historical_prices"]["1m"][last_key_1m]["o"], data["historical_prices"]["1m"][last_key_1m]["c"]) - 5.)
 
@@ -1828,22 +1847,14 @@ class Strategy:
                             #type=Client.FUTURE_ORDER_TYPE_LIMIT
                         )
 
-                        event = asyncio.Event()
                         await asyncio.gather(
                             event.wait(),
-                            self.check_event(
-                                cond=all(
-                                            [
-                                                self.wallet.binance.client.futures_get_order(
-                                                    symbol=self.wallet.orders[self.wallet.INDEX]['Symbol'],
-                                                    orderId=self.wallet.orders[self.wallet.INDEX]['IdOpen']
-                                                    )['status'] == 'FILLED'
-                                            ]
-                                        ),
+                            self.check_event_is_order_filled(
                                 event=event,
                                 t=1
                             )
                         )
+                        event.clear()
                         
                         print(self.wallet.orders)
 
@@ -1863,22 +1874,14 @@ class Strategy:
                             #type=Client.FUTURE_ORDER_TYPE_LIMIT
                         )
 
-                        event = asyncio.Event()
                         await asyncio.gather(
                             event.wait(),
-                            self.check_event(
-                                cond=all(
-                                            [
-                                                self.wallet.binance.client.futures_get_order(
-                                                    symbol=self.wallet.orders[self.wallet.INDEX]['Symbol'],
-                                                    orderId=self.wallet.orders[self.wallet.INDEX]['IdOpen']
-                                                    )['status'] == 'FILLED'
-                                            ]
-                                        ),
+                            self.check_event_is_order_filled(
                                 event=event,
                                 t=1
                             )
                         )
+                        event.clear()
 
                         print(self.wallet.orders)
 
@@ -1887,7 +1890,7 @@ class Strategy:
 
                         self.write_to_excel()
 
-                        event2 = asyncio.Event()
+                        '''event2 = asyncio.Event()
                         await asyncio.gather(
                             event2.wait(),
                             self.check_event(
@@ -1899,7 +1902,16 @@ class Strategy:
                                 event=event2,
                                 t=5
                             )
+                        )'''
+
+                        await asyncio.gather(
+                            event.wait(),
+                            self.check_event_reset_conditions(
+                                event=event,
+                                t=1
+                            )
                         )
+                        event.clear()
 
                         '''await self.check_conditions(
                             cond=all([
@@ -1950,22 +1962,14 @@ class Strategy:
                             #type=Client.FUTURE_ORDER_TYPE_LIMIT
                         )
 
-                        event = asyncio.Event()
                         await asyncio.gather(
                             event.wait(),
-                            self.check_event(
-                                cond=all(
-                                            [
-                                                self.wallet.binance.client.futures_get_order(
-                                                    symbol=self.wallet.orders[self.wallet.INDEX]['Symbol'],
-                                                    orderId=self.wallet.orders[self.wallet.INDEX]['IdOpen']
-                                                    )['status'] == 'FILLED'
-                                            ]
-                                        ),
+                            self.check_event_is_order_filled(
                                 event=event,
                                 t=1
                             )
                         )
+                        event.clear()
 
                         print(self.wallet.orders)
 
@@ -1985,22 +1989,14 @@ class Strategy:
                             #type=Client.FUTURE_ORDER_TYPE_LIMIT
                         )
 
-                        event = asyncio.Event()
                         await asyncio.gather(
                             event.wait(),
-                            self.check_event(
-                                cond=all(
-                                            [
-                                                self.wallet.binance.client.futures_get_order(
-                                                    symbol=self.wallet.orders[self.wallet.INDEX]['Symbol'],
-                                                    orderId=self.wallet.orders[self.wallet.INDEX]['IdOpen']
-                                                    )['status'] == 'FILLED'
-                                            ]
-                                        ),
+                            self.check_event_is_order_filled(
                                 event=event,
                                 t=1
                             )
                         )
+                        event.clear()
 
                         print(self.wallet.orders)
 
@@ -2009,7 +2005,7 @@ class Strategy:
 
                         self.write_to_excel()
 
-                        event2 = asyncio.Event()
+                        '''event2 = asyncio.Event()
                         await asyncio.gather(
                             event2.wait(),
                             self.check_event(
@@ -2021,7 +2017,16 @@ class Strategy:
                                 event=event2,
                                 t=5
                             )
+                        )'''
+
+                        await asyncio.gather(
+                            event.wait(),
+                            self.check_event_reset_conditions(
+                                event=event,
+                                t=1
+                            )
                         )
+                        event.clear()
 
                         '''await self.check_conditions(
                             cond=all([
