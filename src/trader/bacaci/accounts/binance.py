@@ -56,7 +56,7 @@ class Binance:
                     timeInForce=Client.TIME_IN_FORCE_GTC,
                     leverage=Parameters.INDEX_POINT.value, # Leverage value
                     quantity=quantity,
-                    price=price-0.5 # develop that statement
+                    price=price+0.5 # develop that statement
                 )
         
         elif side == self.client.SIDE_SELL:
@@ -84,7 +84,7 @@ class Binance:
                     timeInForce=Client.TIME_IN_FORCE_GTC,
                     leverage=Parameters.INDEX_POINT.value, # Leverage value
                     quantity=quantity,
-                    price=price+0.5 # develop that statement
+                    price=price-0.5 # develop that statement
                 )
         
         # return necessary parts of "order" in json
@@ -126,7 +126,7 @@ class Binance:
                     timeInForce=Client.TIME_IN_FORCE_GTC,
                     leverage=Parameters.INDEX_POINT.value, # Leverage value
                     quantity=quantity,
-                    price=price+.5 # develop that statement
+                    price=price-0.5 # develop that statement
                 )
 
         if side == self.client.SIDE_SELL:
@@ -154,7 +154,7 @@ class Binance:
                     timeInForce=Client.TIME_IN_FORCE_GTC,
                     leverage=Parameters.INDEX_POINT.value, # Leverage value
                     quantity=quantity,
-                    price=price-.5 # develop that statement
+                    price=price+0.5 # develop that statement
                 )
         
         # return necessary parts of "order" in json

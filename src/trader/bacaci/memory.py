@@ -83,6 +83,7 @@ class Memory:
                     "isMin": None,
                     "rsi-1m": None,
                     "rsi-5m": None,
+                    "rsi-15m": None,
                     "percent": None
                 }
             }
@@ -90,25 +91,26 @@ class Memory:
             intervals = ['1s', '1m', '5m', '15m']
             #intervals = ['1s', '1m', '5m']
 
-            rows = [
-                self.database.fetch_rows(
-                    Data.table_name(self.SYMBOL, intervals[0], self.API),
-                    limit=6000
-                    #limit=1000
-                ),
-                self.database.fetch_rows(
-                    Data.table_name(self.SYMBOL, intervals[1], self.API),
-                    limit=100
-                ),
-                self.database.fetch_rows(
-                    Data.table_name(self.SYMBOL, intervals[2], self.API),
-                    limit=100
-                ),
-                self.database.fetch_rows(
-                    Data.table_name(self.SYMBOL, intervals[3], self.API),
-                    limit=16
-                )
-            ]
+            async with self.lock:
+                rows = [
+                    self.database.fetch_rows(
+                        Data.table_name(self.SYMBOL, intervals[0], self.API),
+                        limit=6000
+                        #limit=1000
+                    ),
+                    self.database.fetch_rows(
+                        Data.table_name(self.SYMBOL, intervals[1], self.API),
+                        limit=100
+                    ),
+                    self.database.fetch_rows(
+                        Data.table_name(self.SYMBOL, intervals[2], self.API),
+                        limit=100
+                    ),
+                    self.database.fetch_rows(
+                        Data.table_name(self.SYMBOL, intervals[3], self.API),
+                        limit=16
+                    )
+                ]
 
             dfs = [
                 pd.DataFrame(
@@ -254,7 +256,9 @@ class Memory:
                     "normalized_volume": row.iloc[8],
                     "scaled_volume": row.iloc[9],
                     "minmax_volume": row.iloc[10],
-                    "coef": abs(row.iloc[7] - 50) * row.iloc[8]
+                    "coef": abs(row.iloc[7] - 50) * row.iloc[8],
+                    "isMinLocal": None,
+                    "isMaxLocal": None
                 }
             print("fetched 1s data")
 
@@ -273,8 +277,58 @@ class Memory:
                     "normalized_volume": row.iloc[8],
                     "scaled_volume": row.iloc[9],
                     "minmax_volume": row.iloc[10],
-                    "coef": abs(row.iloc[7] - 50) * row.iloc[8]
+                    "coef": abs(row.iloc[7] - 50) * row.iloc[8],
+                    "isMinLocal": None,
+                    "isMaxLocal": None
                 }
+            
+            
+
+            for i, row in data[1].iloc[1:-2].iterrows():
+
+                '''price_low_0, price_low_1, price_low_2 = 0, 0, 0
+                price_high_0, price_high_1, price_high_2 = 0, 0, 0
+
+                if Memory.isGreen(int(row.iloc[0]), Data.table_name(self.SYMBOL, intervals[1], self.API)):
+                    price_low_1 = row.iloc[2]
+                    price_high_1 = row.iloc[5]
+                elif Memory.isRed(int(row.iloc[0]), Data.table_name(self.SYMBOL, intervals[1], self.API)):
+                    price_low_1 = row.iloc[5]
+                    price_high_1 = row.iloc[2]
+
+                if Memory.isGreen(int(data[1].iloc[i-1,0]), Data.table_name(self.SYMBOL, intervals[1], self.API)):
+                    price_low_0 = data[1].iloc[i-1,2]
+                    price_high_0 = data[1].iloc[i-1,5]
+                elif Memory.isRed(int(data[1].iloc[i-1,0]), Data.table_name(self.SYMBOL, intervals[1], self.API)):
+                    price_low_0 = data[1].iloc[i-1,5]
+                    price_high_0 = data[1].iloc[i-1,2]
+
+                if Memory.isGreen(int(data[1].iloc[i+1,0]), Data.table_name(self.SYMBOL, intervals[1], self.API)):
+                    price_low_2 = data[1].iloc[i+1,2]
+                    price_high_2 = data[1].iloc[i+1,5]
+                elif Memory.isRed(int(data[1].iloc[i+1,0]), Data.table_name(self.SYMBOL, intervals[1], self.API)):
+                    price_low_2 = data[1].iloc[i+1,5]
+                    price_high_2 = data[1].iloc[i+1,2]
+
+                if price_low_1 <= price_low_0 and price_low_1 <= price_low_2:
+                    self.memory["historical_prices"]["1m"][int(row.iloc[0])]["isMinLocal"] = True
+                else:
+                    self.memory["historical_prices"]["1m"][int(row.iloc[0])]["isMinLocal"] = False
+
+                if price_high_1 >= price_high_0 and price_high_1 >= price_high_2:
+                    self.memory["historical_prices"]["1m"][int(row.iloc[0])]["isMaxLocal"] = True
+                else:
+                    self.memory["historical_prices"]["1m"][int(row.iloc[0])]["isMaxLocal"] = False'''
+
+                if row.iloc[4] <= data[1].iloc[i-1,4] and row.iloc[4] <= data[1].iloc[i+1,4]:
+                    self.memory["historical_prices"]["1m"][int(row.iloc[0])]["isMinLocal"] = True
+                else:
+                    self.memory["historical_prices"]["1m"][int(row.iloc[0])]["isMinLocal"] = False
+
+                if row.iloc[3] >= data[1].iloc[i-1,3] and row.iloc[3] >= data[1].iloc[i+1,3]:
+                    self.memory["historical_prices"]["1m"][int(row.iloc[0])]["isMaxLocal"] = True
+                else:
+                    self.memory["historical_prices"]["1m"][int(row.iloc[0])]["isMaxLocal"] = False
             print("fetched 1m data")
 
             for i, row in data[2].iloc[:-1].iterrows():
@@ -292,8 +346,51 @@ class Memory:
                     "normalized_volume": row.iloc[8],
                     "scaled_volume": row.iloc[9],
                     "minmax_volume": row.iloc[10],
-                    "coef": abs(row.iloc[7] - 50) * row.iloc[8]
+                    "coef": abs(row.iloc[7] - 50) * row.iloc[8],
+                    "isMinLocal": None,
+                    "isMaxLocal": None
                 }
+            
+            for i, row in data[2].iloc[1:-2].iterrows():
+
+                price_low_0, price_low_1, price_low_2 = 0, 0, 0
+                price_high_0, price_high_1, price_high_2 = 0, 0, 0
+
+                if Memory.isGreen(int(row.iloc[0]), Data.table_name(self.SYMBOL, intervals[2], self.API)):
+                    price_low_1 = row.iloc[2]
+                    price_high_1 = row.iloc[5]
+                elif Memory.isRed(int(row.iloc[0]), Data.table_name(self.SYMBOL, intervals[2], self.API)):
+                    price_low_1 = row.iloc[5]
+                    price_high_1 = row.iloc[2]
+
+                if Memory.isGreen(int(data[2].iloc[i-1,0]), Data.table_name(self.SYMBOL, intervals[2], self.API)):
+                    price_low_0 = data[2].iloc[i-1,2]
+                    price_high_0 = data[2].iloc[i-1,5]
+                elif Memory.isRed(int(data[2].iloc[i-1,0]), Data.table_name(self.SYMBOL, intervals[2], self.API)):
+                    price_low_0 = data[2].iloc[i-1,5]
+                    price_high_0 = data[2].iloc[i-1,2]
+
+                if Memory.isGreen(int(data[2].iloc[i+1,0]), Data.table_name(self.SYMBOL, intervals[2], self.API)):
+                    price_low_2 = data[2].iloc[i+1,2]
+                    price_high_2 = data[2].iloc[i+1,5]
+                elif Memory.isRed(int(data[2].iloc[i+1,0]), Data.table_name(self.SYMBOL, intervals[2], self.API)):
+                    price_low_2 = data[2].iloc[i+1,5]
+                    price_high_2 = data[2].iloc[i+1,2]
+
+                if price_low_1 <= price_low_0 and price_low_1 <= price_low_2:
+                    self.memory["historical_prices"]["5m"][int(row.iloc[0])]["isMinLocal"] = True
+                else:
+                    self.memory["historical_prices"]["5m"][int(row.iloc[0])]["isMinLocal"] = False
+
+                if price_high_1 >= price_high_0 and price_high_1 >= price_high_2:
+                    self.memory["historical_prices"]["5m"][int(row.iloc[0])]["isMaxLocal"] = True
+                else:
+                    self.memory["historical_prices"]["5m"][int(row.iloc[0])]["isMaxLocal"] = False
+
+                '''if row.iloc[5] <= data[2].iloc[i-1,5] and row.iloc[5] <= data[2].iloc[i+1,5]:
+                    self.memory["historical_prices"]["5m"][int(row.iloc[0])]["isMinLocal"] = True
+                else:
+                    self.memory["historical_prices"]["5m"][int(row.iloc[0])]["isMinLocal"] = False'''
             print("fetched 5m data")
             # ...
 
@@ -312,7 +409,9 @@ class Memory:
                     "normalized_volume": None,
                     "scaled_volume": None,
                     "minmax_volume": None,
-                    "coef": None
+                    "coef": None,
+                    "isMinLocal": None,
+                    "isMaxLocal": None
                 }
             print("fetched 15m data")
 
@@ -329,7 +428,7 @@ class Memory:
         database = Database(database_name)
         row = database.fetch_rows(table_name, timestamp)
 
-        if row[5] > row[2]:
+        if row[0][5] > row[0][2]:
             return True
         return False
     
@@ -338,7 +437,7 @@ class Memory:
         database = Database(database_name)
         row = database.fetch_rows(table_name, timestamp)
 
-        if row[5] <= row[2]:
+        if row[0][5] <= row[0][2]:
             return True
         return False
 

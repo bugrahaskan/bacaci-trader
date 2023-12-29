@@ -19,6 +19,8 @@ class Data:
         self.SYMBOL = symbol
         self.ARG = arg
 
+        self.lock = asyncio.Lock()
+
         if self.API == Parameters.BINANCE.value:
             self.client = Binance.binance_connect()
 
@@ -265,7 +267,8 @@ class Data:
         int_list = [value for key, value in config['Intervals'].items()]
         #intervals = ['1s', '1m', '5m']
         tasks = [asyncio.create_task(self.data(self.SYMBOL, interval)) for interval in int_list]
-        await asyncio.gather(*tasks)
+        async with self.lock:
+            await asyncio.gather(*tasks)
     
     # correct it if necessary
     @staticmethod

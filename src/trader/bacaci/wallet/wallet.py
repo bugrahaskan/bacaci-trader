@@ -372,7 +372,7 @@ class Wallet:
         
         else:
             return False
-        
+
 
 class TrailingStop:
 
@@ -415,6 +415,7 @@ class MyTrailingStop:
     def __init__(self, initial_stop):
         self.initial_stop = initial_stop
         self.current_stop = initial_stop
+        self.stop_loss = StopLoss(self.initial_stop)
 
     def actual_stop(self):
 
@@ -444,6 +445,24 @@ class MyTrailingStop:
             if new_stop < self.current_stop:
                 self.current_stop = new_stop
             
+            self.stop_loss = StopLoss(self.current_stop)
+
+            return self.current_stop
+        
+    def set_stop(self, new_stop, side):
+
+        if side == Parameters.TYPE_LONG.value:
+            if new_stop > self.current_stop:
+                self.current_stop = new_stop
+
+            self.stop_loss = StopLoss(self.current_stop)
+
+            return self.current_stop
+
+        if side == Parameters.TYPE_SHORT.value:
+            if new_stop < self.current_stop:
+                self.current_stop = new_stop
+
             self.stop_loss = StopLoss(self.current_stop)
 
             return self.current_stop
