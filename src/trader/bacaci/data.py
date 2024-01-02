@@ -302,8 +302,8 @@ class Data:
         async with websockets.connect(uri) as websocket:
             while True:
                 resp = await websocket.recv()  # Receiving a message
-                if resp:
-                    resp = json.loads(resp)
+                resp = json.loads(resp)
+                if resp["k"]["x"]:
                     df = Data.generate_df_ws(resp)
                     database.insert_data(df, tableName)
                     print(resp["k"])

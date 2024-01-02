@@ -56,7 +56,7 @@ class Database:
                     (
                     df["timestamp"][i],
                     df["date"][i],
-                    df['price'][i]
+                    df["price"][i],
                     )
                 )
             self.commit_db() # optional
