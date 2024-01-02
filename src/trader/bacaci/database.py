@@ -17,41 +17,69 @@ class Database:
         self._conn = sqlite3.connect(self._db_name)
         self._cur = self._conn.cursor()
     
-    def create_table(self, table_name):
-        self.connect_db()
+    def create_table(self, table_name, tick=False):
+        if tick:
+            self.connect_db()
 
-        self._cur.execute(
-        '''CREATE TABLE IF NOT EXISTS {} (
-        timestamp INTEGER PRIMARY KEY,
-        date DATETIME,
-        open FLOAT,
-        high FLOAT,
-        low FLOAT,
-        close FLOAT,
-        volume FLOAT,
-        UNIQUE(date),
-        UNIQUE(timestamp)
-        );
-        '''.format(table_name))
+            self._cur.execute(
+            '''CREATE TABLE IF NOT EXISTS {} (
+            timestamp INTEGER PRIMARY KEY,
+            date DATETIME,
+            price FLOAT,
+            UNIQUE(date),
+            UNIQUE(timestamp)
+            );
+            '''.format(table_name))
+        else:
+            self.connect_db()
+
+            self._cur.execute(
+            '''CREATE TABLE IF NOT EXISTS {} (
+            timestamp INTEGER PRIMARY KEY,
+            date DATETIME,
+            open FLOAT,
+            high FLOAT,
+            low FLOAT,
+            close FLOAT,
+            volume FLOAT,
+            UNIQUE(date),
+            UNIQUE(timestamp)
+            );
+            '''.format(table_name))
     
-    def insert_data(self, df, table_name):
-        self.create_table(table_name)
-        for i in range(df.shape[0]):
-            self._cur.execute("INSERT OR REPLACE INTO {} (timestamp, date, open, high, low, close, volume) VALUES (?,?,?,?,?,?,?)".format(table_name),
-                (
-                df["timestamp"][i],
-                df["date"][i],
-                df['open'][i],
-                df['high'][i],
-                df['low'][i],
-                df['close'][i],
-                df['volume'][i],
+    def insert_data(self, df, table_name, tick=False):
+        if tick:
+            self.create_table(table_name, tick=tick)
+
+            for i in range(df.shape[0]):
+                self._cur.execute("INSERT OR REPLACE INTO {} (timestamp, date, price) VALUES (?,?,?)".format(table_name),
+                    (
+                    df["timestamp"][i],
+                    df["date"][i],
+                    df['price'][i]
+                    )
                 )
-            )
-        self.commit_db() # optional
-        self.close_db() # optional
+            self.commit_db() # optional
+            self.close_db() # optional
+        else:
+            self.create_table(table_name, tick=tick)
+            for i in range(df.shape[0]):
+                self._cur.execute("INSERT OR REPLACE INTO {} (timestamp, date, open, high, low, close, volume) VALUES (?,?,?,?,?,?,?)".format(table_name),
+                    (
+                    df["timestamp"][i],
+                    df["date"][i],
+                    df['open'][i],
+                    df['high'][i],
+                    df['low'][i],
+                    df['close'][i],
+                    df['volume'][i],
+                    )
+                )
+            self.commit_db() # optional
+            self.close_db() # optional
     
     # fetch rows
+    # correct if any
     def fetch_rows(self, table_name, start_time: int = None, end_time: int = None, limit: int = None, timestamp: int = None, **kwargs):
         """
         if start_time & end_time & limit : Fetch rows between start_time and end_time. If number of rows greater than limit, return most recent limit number of rows between given dates

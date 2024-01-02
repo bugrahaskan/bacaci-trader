@@ -221,20 +221,28 @@ class Data:
         print(f"{params['interval']} function has worked")
     
     @staticmethod
-    def generate_df_ws(res):
-        df = pd.DataFrame()
-        k = res["k"]
-        df["timestamp"] = [int(k["t"]) / 1000]
-        df["date"] = str(Data.to_datetime(int(df["timestamp"][0])))
-        df["open"] = k["o"]
-        df["high"] = k["h"]
-        df["low"] = k["l"]
-        df["close"] = k["c"]
-        df["volume"] = k["v"]
+    def generate_df_ws(res, tick=False):
+        if tick:
+            df = pd.DataFrame()
+            df["timestamp"] = [int(res["E"]) / 1000]
+            df["date"] = str(Data.to_datetime(int(df["timestamp"][0])))
+            df["price"] = res["p"]
 
-        return df
+            return df
+        else:
+            df = pd.DataFrame()
+            k = res["k"]
+            df["timestamp"] = [int(k["t"]) / 1000]
+            df["date"] = str(Data.to_datetime(int(df["timestamp"][0])))
+            df["open"] = k["o"]
+            df["high"] = k["h"]
+            df["low"] = k["l"]
+            df["close"] = k["c"]
+            df["volume"] = k["v"]
 
-    async def data(self, symbol, interval):
+            return df
+
+    '''async def data(self, symbol, interval):
         client = await AsyncClient.create()
         #client = Client(
         #    api_key=Parameters.BINANCE_API_KEY.value,
@@ -261,7 +269,7 @@ class Data:
                     print(res["k"])
                     await asyncio.sleep(0.1)
 
-        await client.close_connection()
+        await client.close_connection()'''
 
     async def tick_data(self, symbol, interval="1s"):
         uri = f"wss://fstream.binance.com/ws/{symbol.lower()}@markPrice@1s"  # 1s data
@@ -276,8 +284,8 @@ class Data:
                 resp = await websocket.recv()  # Receiving a message
                 if resp:
                     resp = json.loads(resp)
-                    df = Data.generate_df_ws(resp)
-                    database.insert_data(df, tableName)
+                    df = Data.generate_df_ws(resp, tick=True)
+                    database.insert_data(df, tableName, tick=True)
                     print(resp["p"])
                     #await asyncio.sleep(0.1)
         
