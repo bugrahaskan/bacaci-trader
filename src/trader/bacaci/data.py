@@ -308,7 +308,16 @@ class Data:
         config.read('config.ini')
         int_list = [value for key, value in config['Intervals'].items()]
         #intervals = ['1s', '1m', '5m']
-        tasks = [asyncio.create_task(self.data(self.SYMBOL, interval)) for interval in int_list]
+
+        tasks = []
+        for interval in int_list:
+            if interval == "1s":
+                tasks.append(asyncio.create_task(self.tick_data(self.SYMBOL, interval)))
+            else:
+                tasks.append(asyncio.create_task(self.kline_data(self.SYMBOL, interval)))
+
+        #tasks = [asyncio.create_task(self.data(self.SYMBOL, interval)) for interval in int_list]
+        
         async with self.lock:
             await asyncio.gather(*tasks)
     
