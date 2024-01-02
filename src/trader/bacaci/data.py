@@ -224,9 +224,9 @@ class Data:
     def generate_df_ws(res, tick=False):
         if tick:
             df = pd.DataFrame()
-            df["timestamp"] = [int(res["E"]) / 1000]
+            df["timestamp"] = [int(int(res["E"]) / 1000)]
             df["date"] = str(Data.to_datetime(int(df["timestamp"][0])))
-            df["price"] = res["p"]
+            df["price"] = float(res["p"])
 
             return df
         else:

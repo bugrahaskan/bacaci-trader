@@ -21,15 +21,18 @@ class Database:
         if tick:
             self.connect_db()
 
-            self._cur.execute(
-            '''CREATE TABLE IF NOT EXISTS {} (
-            timestamp INTEGER PRIMARY KEY,
-            date DATETIME,
-            price FLOAT,
-            UNIQUE(date),
-            UNIQUE(timestamp)
-            );
-            '''.format(table_name))
+            try:
+                self._cur.execute(
+                '''CREATE TABLE IF NOT EXISTS {} (
+                timestamp INTEGER PRIMARY KEY,
+                date DATETIME,
+                price REAL,
+                UNIQUE(date),
+                UNIQUE(timestamp)
+                );
+                '''.format(table_name))
+            except Exception as e:
+                print(e)
         else:
             self.connect_db()
 
@@ -51,16 +54,25 @@ class Database:
         if tick:
             self.create_table(table_name, tick=tick)
 
-            for i in range(df.shape[0]):
-                self._cur.execute("INSERT OR REPLACE INTO {} (timestamp, date, price) VALUES (?,?,?)".format(table_name),
-                    (
-                    df["timestamp"][i],
-                    df["date"][i],
-                    df["price"][i],
+            index = 0
+
+            try:
+                for i in range(df.shape[0]):
+                    self._cur.execute("INSERT OR REPLACE INTO {} (timestamp, date, price) VALUES (?,?,?)".format(table_name),
+                        (
+                        int(df["timestamp"][i]),
+                        str(df["date"][i]),
+                        float(df["price"][i]),
+                        )
                     )
-                )
-            self.commit_db() # optional
-            self.close_db() # optional
+                    index = i    
+                self.commit_db() # optional
+                self.close_db() # optional
+            except Exception as e:
+                print(f"{df['timestamp'][index]},{type(df['timestamp'][index])}")
+                print(f"{df['date'][index]},{type(df['date'][index])}")
+                print(f"{df['price'][index]},{type(df['price'][index])}")
+                print(e)
         else:
             self.create_table(table_name, tick=tick)
             for i in range(df.shape[0]):
