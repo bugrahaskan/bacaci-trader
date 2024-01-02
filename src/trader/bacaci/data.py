@@ -6,6 +6,8 @@ from datetime import datetime
 import schedule
 import configparser
 import asyncio
+import websockets
+import json
 
 from .accounts.binance import Binance
 from .database import Database
@@ -259,6 +261,46 @@ class Data:
                     print(res["k"])
                     await asyncio.sleep(0.1)
 
+        await client.close_connection()
+
+    async def tick_data(self, symbol, interval="1s"):
+        uri = f"wss://fstream.binance.com/ws/{symbol.lower()}@markPrice@1s"  # 1s data
+
+        tableName = Data.table_name(symbol, interval, self.API)
+        database = Database(
+            db_name=Parameters.DATABASE.value
+            )
+
+        async with websockets.connect(uri) as websocket:
+            while True:
+                resp = await websocket.recv()  # Receiving a message
+                if resp:
+                    resp = json.loads(resp)
+                    df = Data.generate_df_ws(resp)
+                    database.insert_data(df, tableName)
+                    print(resp["p"])
+                    #await asyncio.sleep(0.1)
+        
+        await client.close_connection()
+
+    async def kline_data(self, symbol, interval):
+        uri = f"wss://fstream.binance.com/ws/{symbol.lower()}_perpetual@continuousKline_{interval}" # interval data
+
+        tableName = Data.table_name(symbol, interval, self.API)
+        database = Database(
+            db_name=Parameters.DATABASE.value
+            )
+        
+        async with websockets.connect(uri) as websocket:
+            while True:
+                resp = await websocket.recv()  # Receiving a message
+                if resp:
+                    resp = json.loads(resp)
+                    df = Data.generate_df_ws(resp)
+                    database.insert_data(df, tableName)
+                    print(resp["k"])
+                    #await asyncio.sleep(0.1)
+        
         await client.close_connection()
     
     async def main(self):

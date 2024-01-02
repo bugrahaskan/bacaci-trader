@@ -53,7 +53,7 @@ class Strategy:
         loop.run_until_complete(
             asyncio.gather(
                 self.memory.mem(),
-                self.strategy_2_DEV()
+                self.strategy_1_PROD()
             )
         )
 
@@ -1201,7 +1201,7 @@ class Strategy:
                 log.write(json.dumps(self.wallet.orders))
 
     '''LIVE STRATEGIES'''
-    async def strategy_2_DEV(self, order_type="market"):
+    async def strategy_2_PROD(self, order_type="market"):
 
         while True:
 
@@ -2110,7 +2110,7 @@ class Strategy:
             with open(f"log.json", "w") as log:
                 log.write(json.dumps(self.wallet.orders))
 
-    async def strategy_1_DEV(self):
+    async def strategy_1_PROD(self):
 
         while True:
 
@@ -2128,19 +2128,25 @@ class Strategy:
                 list(data["historical_prices"]["5m"].keys())[-i] for i in range(1,10)
             ]
 
+            print("current price:", data["historical_prices"]["1s"][last_key_1s]["c"])
+
             if not self.wallet.is_open():
                 #print("Waiting to open position")
                 print("Waiting to open position", Data.to_datetime(data["current_date"]))
+                print("RSI 1m:", data["historical_prices"]["1m"][last_key_1m]["rsi"])
+                print("RSI 5m:", data["historical_prices"]["5m"][last_key_5m]["rsi"])
+                print("Norm. volume 1m:", data["historical_prices"]["1m"][last_key_1m]["normalized_volume"])
+                print("Norm. volume 1m:", data["historical_prices"]["5m"][last_key_5m]["normalized_volume"])
 
                 resp1, resp2 = await asyncio.gather(
                     self.check_conditions(
                         cond=all(
                             [
                                 #not abs(data["historical_prices"]["1m"][last_key_1m]["rsi"] - 70.) < 4.,
-                                data["historical_prices"]["1m"][last_key_1m]["rsi"] > (70 - 1.),
+                                data["historical_prices"]["1m"][last_key_1m]["rsi"] > (70 - 4.),
                                 data["historical_prices"]["1m"][last_key_1m]["normalized_volume"] > 1.,
                                 #abs(data["historical_prices"]["5m"][last_key_5m]["rsi"] - 70.) < 3.,
-                                data["historical_prices"]["5m"][last_key_5m]["rsi"] > (70 - 4.),
+                                data["historical_prices"]["5m"][last_key_5m]["rsi"] > (70 - 6.),
                                 data["historical_prices"]["5m"][last_key_5m]["normalized_volume"] > 1.
                             ]
                         )
@@ -2149,10 +2155,10 @@ class Strategy:
                         cond=all(
                             [
                                 #not abs(data["historical_prices"]["1m"][last_key_1m]["rsi"] - 30.) < 4.,
-                                data["historical_prices"]["1m"][last_key_1m]["rsi"] < (30 + 1.),
+                                data["historical_prices"]["1m"][last_key_1m]["rsi"] < (30 + 4.),
                                 data["historical_prices"]["1m"][last_key_1m]["normalized_volume"] > 1.,
                                 #abs(data["historical_prices"]["5m"][last_key_5m]["rsi"] - 30.) < 3.,
-                                data["historical_prices"]["5m"][last_key_5m]["rsi"] < (30 + 4.),
+                                data["historical_prices"]["5m"][last_key_5m]["rsi"] < (30 + 6.),
                                 data["historical_prices"]["5m"][last_key_5m]["normalized_volume"] > 1.
                             ]
                         )
@@ -2170,12 +2176,23 @@ class Strategy:
                         date=Data.to_datetime(data["historical_prices"]["1s"][last_key_1s]["t"]).strftime("%Y-%m-%d %H:%M:%S")
                     )
 
-                    stop_loss = StopLoss(max(data["historical_prices"]["1m"][last_key_1m]["o"], data["historical_prices"]["1m"][last_key_1m]["c"]) - 2.)
-                    trailing_stop = MyTrailingStop(data["historical_prices"]["1m"][last_key_1m]["c"] - 5.)
+                    await asyncio.gather(
+                        event.wait(),
+                        self.check_event_is_order_filled(
+                            event=event,
+                            t=1
+                        )
+                    )
+                    event.clear()
+
+                    #stop_loss = StopLoss(max(data["historical_prices"]["1m"][last_key_1m]["o"], data["historical_prices"]["1m"][last_key_1m]["c"]) - 2.)
+                    #trailing_stop = MyTrailingStop(data["historical_prices"]["1m"][last_key_1m]["c"] - 5.)
+                    trailing_stop = MyTrailingStop(data["historical_prices"]["1s"][last_key_1s]["c"] - 5.)
+                    print(f'current stop is {trailing_stop.actual_stop()}')
 
                     print(self.wallet.orders)
 
-                    #Notification("bhaskan@bacaciyatirim.com", json.dumps(self.wallet.orders[self.wallet.INDEX]))
+                    Notification("bhaskan@bacaciyatirim.com", json.dumps(self.wallet.orders[self.wallet.INDEX]))
                     #Notification("oozlen@bacaciyatirim.com", json.dumps(self.wallet.orders[self.wallet.INDEX]))
 
                     self.write_to_excel()
@@ -2191,12 +2208,23 @@ class Strategy:
                         date=Data.to_datetime(data["historical_prices"]["1s"][last_key_1s]["t"]).strftime("%Y-%m-%d %H:%M:%S")
                     )
 
-                    stop_loss = StopLoss(max(data["historical_prices"]["1m"][last_key_1m]["o"], data["historical_prices"]["1m"][last_key_1m]["c"]) + 2.)
-                    trailing_stop = MyTrailingStop(data["historical_prices"]["1m"][last_key_1m]["c"] + 5.)
+                    await asyncio.gather(
+                        event.wait(),
+                        self.check_event_is_order_filled(
+                            event=event,
+                            t=1
+                        )
+                    )
+                    event.clear()
+
+                    #stop_loss = StopLoss(max(data["historical_prices"]["1m"][last_key_1m]["o"], data["historical_prices"]["1m"][last_key_1m]["c"]) + 2.)
+                    #trailing_stop = MyTrailingStop(data["historical_prices"]["1m"][last_key_1m]["c"] + 5.)
+                    trailing_stop = MyTrailingStop(data["historical_prices"]["1s"][last_key_1s]["c"] + 5.)
+                    print(f'current stop is {trailing_stop.actual_stop()}')
 
                     print(self.wallet.orders)
 
-                    #Notification("bhaskan@bacaciyatirim.com", json.dumps(self.wallet.orders[self.wallet.INDEX]))
+                    Notification("bhaskan@bacaciyatirim.com", json.dumps(self.wallet.orders[self.wallet.INDEX]))
                     #Notification("oozlen@bacaciyatirim.com", json.dumps(self.wallet.orders[self.wallet.INDEX]))
 
                     self.write_to_excel()
@@ -2206,8 +2234,23 @@ class Strategy:
 
                 if self.wallet.orders[self.wallet.INDEX]["Side"] == Parameters.TYPE_LONG.value:
 
-                    trailing_stop.update_stop(data["historical_prices"]["1s"][last_key_1s]["c"], Parameters.TYPE_LONG.value)
-                    print("Current Stop:", trailing_stop.current_stop)
+                    for key in last_keys_1m:
+                        if int(key) > Data.to_timestamp(self.wallet.orders[self.wallet.INDEX]["DateOpen"]):
+                            if data["historical_prices"]["1m"][key]["isMinLocal"]:
+                                curr_stop = trailing_stop.set_stop(
+                                    #min(data["historical_prices"]["1m"][key]["o"], data["historical_prices"]["1m"][key]["c"]),
+                                    data["historical_prices"]["1m"][key]["l"],
+                                    Parameters.TYPE_LONG.value
+                                )
+                                print(f'updated stop is {curr_stop}')
+                                
+                                break
+                    print(f'current stop is {trailing_stop.actual_stop()} at {Data.to_datetime(data["current_date"])}')
+                    print("current price:", data["historical_prices"]["1s"][last_key_1s]["c"])
+                    print("current bar:", Data.to_datetime(data["historical_prices"]["1m"][last_key_1m]["t"]).strftime("%Y-%m-%d %H:%M:%S"))
+
+                    #trailing_stop.update_stop(data["historical_prices"]["1s"][last_key_1s]["c"], Parameters.TYPE_LONG.value)
+                    #print("Current Stop:", trailing_stop.current_stop)
                     
                     '''resp = await self.check_conditions(
                         cond=all(
@@ -2217,7 +2260,15 @@ class Strategy:
                         )
                     )'''
 
-                    resp1, resp2 = await asyncio.gather(
+                    resp1 = await self.check_conditions(
+                        cond=all(
+                            [
+                                trailing_stop.check_trigger(data["historical_prices"]["1s"][last_key_1s]["c"], Parameters.TYPE_LONG.value)
+                            ]
+                        )
+                    )
+
+                    '''resp1, resp2 = await asyncio.gather(
                         self.check_conditions(
                             cond=all(
                                 [
@@ -2233,10 +2284,10 @@ class Strategy:
                                 ]
                             )
                         )
-                    )
+                    )'''
 
                     if resp1:
-                        print("Position closed")
+                        print("Position closed - Trailing Stop")
 
                         self.wallet.close_position(
                             side="SELL",
@@ -2244,14 +2295,24 @@ class Strategy:
                             price=data["historical_prices"]["1s"][last_key_1s]["c"],
                             date=Data.to_datetime(data["historical_prices"]["1s"][last_key_1s]["t"]).strftime("%Y-%m-%d %H:%M:%S")
                         )
+
+                        await asyncio.gather(
+                            event.wait(),
+                            self.check_event_is_order_filled(
+                                event=event,
+                                t=1
+                            )
+                        )
+                        event.clear()
+
                         print(self.wallet.orders)
 
-                        #Notification("bhaskan@bacaciyatirim.com", json.dumps(self.wallet.orders[self.wallet.INDEX]))
+                        Notification("bhaskan@bacaciyatirim.com", json.dumps(self.wallet.orders[self.wallet.INDEX]))
                         #Notification("oozlen@bacaciyatirim.com", json.dumps(self.wallet.orders[self.wallet.INDEX]))
 
                         self.write_to_excel()
                     
-                    elif resp2:
+                    '''elif resp2:
                         print("Stop Loss")
 
                         self.wallet.close_position(
@@ -2260,17 +2321,42 @@ class Strategy:
                             price=data["historical_prices"]["1s"][last_key_1s]["c"],
                             date=Data.to_datetime(data["historical_prices"]["1s"][last_key_1s]["t"]).strftime("%Y-%m-%d %H:%M:%S")
                         )
+
+                        await asyncio.gather(
+                            event.wait(),
+                            self.check_event_is_order_filled(
+                                event=event,
+                                t=1
+                            )
+                        )
+                        event.clear()
+
                         print(self.wallet.orders)
 
-                        #Notification("bhaskan@bacaciyatirim.com", json.dumps(self.wallet.orders[self.wallet.INDEX]))
+                        Notification("bhaskan@bacaciyatirim.com", json.dumps(self.wallet.orders[self.wallet.INDEX]))
                         #Notification("oozlen@bacaciyatirim.com", json.dumps(self.wallet.orders[self.wallet.INDEX]))
 
-                        self.write_to_excel()
+                        self.write_to_excel()'''
 
                 elif self.wallet.orders[self.wallet.INDEX]["Side"] == Parameters.TYPE_SHORT.value:
 
-                    trailing_stop.update_stop(data["historical_prices"]["1s"][last_key_1s]["c"], Parameters.TYPE_SHORT.value)
-                    print("Current Stop:", trailing_stop.current_stop)
+                    for key in last_keys_1m:
+                        if int(key) > Data.to_timestamp(self.wallet.orders[self.wallet.INDEX]["DateOpen"]):
+                            if data["historical_prices"]["1m"][key]["isMaxLocal"]:
+                                curr_stop = trailing_stop.set_stop(
+                                    #max(data["historical_prices"]["1m"][key]["o"], data["historical_prices"]["1m"][key]["c"]),
+                                    data["historical_prices"]["1m"][key]["h"],
+                                    Parameters.TYPE_SHORT.value
+                                )
+                                print(f'updated stop is {curr_stop}')
+                                
+                                break
+                    print(f'current stop is {trailing_stop.actual_stop()} at {Data.to_datetime(data["current_date"])}')
+                    print("current price:", data["historical_prices"]["1s"][last_key_1s]["c"])
+                    print("current bar:", Data.to_datetime(data["historical_prices"]["1m"][last_key_1m]["t"]).strftime("%Y-%m-%d %H:%M:%S"))
+
+                    #trailing_stop.update_stop(data["historical_prices"]["1s"][last_key_1s]["c"], Parameters.TYPE_SHORT.value)
+                    #print("Current Stop:", trailing_stop.current_stop)
                     
                     '''resp = await self.check_conditions(
                         cond=all(
@@ -2280,7 +2366,15 @@ class Strategy:
                         )
                     )'''
 
-                    resp1, resp2 = await asyncio.gather(
+                    resp1 = await self.check_conditions(
+                        cond=all(
+                            [
+                                trailing_stop.check_trigger(data["historical_prices"]["1s"][last_key_1s]["c"], Parameters.TYPE_SHORT.value)
+                            ]
+                        )
+                    )
+
+                    '''resp1, resp2 = await asyncio.gather(
                         self.check_conditions(
                             cond=all(
                                 [
@@ -2296,10 +2390,10 @@ class Strategy:
                                 ]
                             )
                         )
-                    )
+                    )'''
 
                     if resp1:
-                        print("Position closed")
+                        print("Position closed - Trailing Stop")
                         print("5m RSI:", data["historical_prices"]["5m"][last_key_5m]["rsi"])
 
                         self.wallet.close_position(
@@ -2308,14 +2402,24 @@ class Strategy:
                             price=data["historical_prices"]["1s"][last_key_1s]["c"],
                             date=Data.to_datetime(data["historical_prices"]["1s"][last_key_1s]["t"]).strftime("%Y-%m-%d %H:%M:%S")
                         )
+
+                        await asyncio.gather(
+                            event.wait(),
+                            self.check_event_is_order_filled(
+                                event=event,
+                                t=1
+                            )
+                        )
+                        event.clear()
+
                         print(self.wallet.orders)
 
-                        #Notification("bhaskan@bacaciyatirim.com", json.dumps(self.wallet.orders[self.wallet.INDEX]))
+                        Notification("bhaskan@bacaciyatirim.com", json.dumps(self.wallet.orders[self.wallet.INDEX]))
                         #Notification("oozlen@bacaciyatirim.com", json.dumps(self.wallet.orders[self.wallet.INDEX]))
 
                         self.write_to_excel()
 
-                    elif resp2:
+                    '''elif resp2:
                         print("Stop Loss")
 
                         self.wallet.close_position(
@@ -2324,12 +2428,22 @@ class Strategy:
                             price=data["historical_prices"]["1s"][last_key_1s]["c"],
                             date=Data.to_datetime(data["historical_prices"]["1s"][last_key_1s]["t"]).strftime("%Y-%m-%d %H:%M:%S")
                         )
+
+                        await asyncio.gather(
+                            event.wait(),
+                            self.check_event_is_order_filled(
+                                event=event,
+                                t=1
+                            )
+                        )
+                        event.clear()
+
                         print(self.wallet.orders)
 
-                        #Notification("bhaskan@bacaciyatirim.com", json.dumps(self.wallet.orders[self.wallet.INDEX]))
+                        Notification("bhaskan@bacaciyatirim.com", json.dumps(self.wallet.orders[self.wallet.INDEX]))
                         #Notification("oozlen@bacaciyatirim.com", json.dumps(self.wallet.orders[self.wallet.INDEX]))
 
-                        self.write_to_excel()
+                        self.write_to_excel()'''
 
             with open(f"log.json", "w") as log:
                 log.write(json.dumps(self.wallet.orders))
