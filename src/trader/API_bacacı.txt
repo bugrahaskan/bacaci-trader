@@ -15,3 +15,6 @@ secret: 1C6k5S0XFyXXFUvP2f8AJiXKKECwb4OmIxsxLPXVTvpgN0MtA0Xybrvk5CLvu9vs
 OmerAPI:
 public: Y80NBxG1FlQRsCaUIRVEjO2tXdYyUitGMNL3hESzY88eXnRGNooDL37awIQoJ31l
 secret: 6Kr1qXDwZQIx39qLha5FTLD5NoJakhgKRjqU3zZ6eTRlYIKJXkHrXqJK4V7vLn4y
+
+omer.ozlen@bacaciyatirim.com
+Bin.1234

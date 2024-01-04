@@ -53,7 +53,7 @@ class Strategy:
         loop.run_until_complete(
             asyncio.gather(
                 self.memory.mem(),
-                self.strategy_1_PROD()
+                self.strategy_2_PROD()
             )
         )
 
@@ -191,28 +191,23 @@ class Strategy:
             ]
             last_key_5m = list(data["historical_prices"]["5m"].keys())[-1]
 
-            #print("RSI 1m", data["historical_prices"]["1m"][last_key_1m]["rsi"])
-            #print("RSI 5m", data["historical_prices"]["5m"][last_key_5m]["rsi"])
-            #print("realtime RSI 5m", data["current_state"]["rsi-5m"])
+            a = 5
+            b = 4
 
-            #print(last_keys_1m)
-            #print(last_key_1m)
+            resp1 = await self.check_conditions(
+                cond=all(
+                    [
+                        a<0 or a>2,
+                        b == 4
+                    ]
+                )
+            )
 
-            for key in last_keys_1m:
-                print(data["historical_prices"]["1m"][key]["isMinLocal"])
+            if resp1:
 
-            for key in last_keys_1m:
-                if data["historical_prices"]["1m"][key]["isMinLocal"]:
-                    print(f'minLocal at: {data["historical_prices"]["1m"][key]["c"]}')
-
-            
-
-            await asyncio.sleep(30)
-
-            print("it is OK.")
+                print("it is OK.")
 
     async def dummy_strategy(self, cond=False):
-        # WORKING ON STOP_LOSS
 
         while True:
 
@@ -226,7 +221,7 @@ class Strategy:
 
             global event
 
-            print("actual price:", data["historical_prices"]["1s"][last_key_1s]["c"])
+            print("actual price:", data["historical_prices"]["1s"][last_key_1s]["p"])
 
             if not self.wallet.is_open():
                 #time.sleep(5)
@@ -235,7 +230,7 @@ class Strategy:
                 self.wallet.open_position(
                     side="BUY",
                     quantity=self.qty,
-                    price=data["historical_prices"]["1s"][last_key_1s]["c"],
+                    price=data["historical_prices"]["1s"][last_key_1s]["p"],
                     date=Data.to_datetime(data["historical_prices"]["1s"][last_key_1s]["t"]).strftime("%Y-%m-%d %H:%M:%S"),
                     #type=Client.FUTURE_ORDER_TYPE_LIMIT
                 )
@@ -248,11 +243,19 @@ class Strategy:
                         )
                         print(f'current stop is {min(data["historical_prices"]["1m"][key]["o"], data["historical_prices"]["1m"][key]["c"])}')
                         break'''
-                trailing_stop = MyTrailingStop(data["historical_prices"]["1s"][last_key_1s]["c"] - 5.)
+                trailing_stop = MyTrailingStop(data["historical_prices"]["1s"][last_key_1s]["p"] - 5.)
                 print(f'current stop is {trailing_stop.actual_stop()}')
 
                 print(self.wallet.orders)
 
+                await asyncio.gather(
+                    event.wait(),
+                    self.check_event_is_order_filled(
+                        event=event,
+                        t=1
+                    )
+                )
+                event.clear()
                 
 
                 pass
@@ -261,9 +264,9 @@ class Strategy:
 
                 # Calculate PNL %
                 if self.wallet.orders[self.wallet.INDEX]["Side"] == Parameters.TYPE_LONG.value:
-                    profit_percent = 100 * (data["historical_prices"]["1s"][last_key_1s]["c"] - self.wallet.orders[self.wallet.INDEX]["Open"]) * float(Parameters.INDEX_POINT.value) / self.wallet.orders[self.wallet.INDEX]["Open"]
+                    profit_percent = 100 * (data["historical_prices"]["1s"][last_key_1s]["p"] - self.wallet.orders[self.wallet.INDEX]["Open"]) * float(Parameters.INDEX_POINT.value) / self.wallet.orders[self.wallet.INDEX]["Open"]
                 elif self.wallet.orders[self.wallet.INDEX]["Side"] == Parameters.TYPE_SHORT.value:
-                    profit_percent = 100 * (self.wallet.orders[self.wallet.INDEX]["Open"] - data["historical_prices"]["1s"][last_key_1s]["c"]) * float(Parameters.INDEX_POINT.value) / self.wallet.orders[self.wallet.INDEX]["Open"]
+                    profit_percent = 100 * (self.wallet.orders[self.wallet.INDEX]["Open"] - data["historical_prices"]["1s"][last_key_1s]["p"]) * float(Parameters.INDEX_POINT.value) / self.wallet.orders[self.wallet.INDEX]["Open"]
 
                 print("profit percent:", profit_percent)
 
@@ -281,7 +284,7 @@ class Strategy:
                                 
                                 break
                     print(f'current stop is {trailing_stop.actual_stop()} at {Data.to_datetime(data["current_date"])}')
-                    print("current price:", data["historical_prices"]["1s"][last_key_1s]["c"])
+                    print("current price:", data["historical_prices"]["1s"][last_key_1s]["p"])
                     print("current bar:", Data.to_datetime(data["historical_prices"]["1m"][last_key]["t"]).strftime("%Y-%m-%d %H:%M:%S"))
 
                     '''stop_loss = await self.check_conditions(
@@ -295,7 +298,8 @@ class Strategy:
                     resp1 = await self.check_conditions(
                         cond=all(
                             [
-                                trailing_stop.check_trigger(data["historical_prices"]["1s"][last_key_1s]["c"], Parameters.TYPE_LONG.value)
+                                profit_percent<0 or profit_percent>2,
+                                trailing_stop.check_trigger(data["historical_prices"]["1s"][last_key_1s]["p"], Parameters.TYPE_LONG.value)
                             ]
                         )
                     )
@@ -348,7 +352,7 @@ class Strategy:
                         self.wallet.close_position(
                             side="SELL",
                             quantity=self.qty,
-                            price=data["historical_prices"]["1s"][last_key_1s]["c"],
+                            price=data["historical_prices"]["1s"][last_key_1s]["p"],
                             date=Data.to_datetime(data["historical_prices"]["1s"][last_key_1s]["t"]).strftime("%Y-%m-%d %H:%M:%S"),
                             #type=Client.FUTURE_ORDER_TYPE_LIMIT
                         )
@@ -1225,7 +1229,7 @@ class Strategy:
             #    d = "{},{:.{}f}\n".format(Data.to_datetime(data["current_date"]), data["historical_prices"]["5m"][last_key_5m]["rsi"], 2)
             #    r.write(d)
 
-            print("current price:", data["historical_prices"]["1s"][last_key_1s]["c"])
+            print("current price:", data["historical_prices"]["1s"][last_key_1s]["p"])
 
             if not self.wallet.is_open():
                 #print("Waiting to open position")
@@ -1234,7 +1238,7 @@ class Strategy:
                 print("realtime 1m RSI:", data["current_state"]["rsi-1m"])
                 #print("5m RSI:", data["historical_prices"]["5m"][last_key_5m]["rsi"])
                 print("realtime 5m RSI:", data["current_state"]["rsi-5m"])
-                print("normalized volume 1m:", data["historical_prices"]["1m"][last_key_1m]["normalized_volume"])
+                #print("normalized volume 1m:", data["historical_prices"]["1m"][last_key_1m]["normalized_volume"])
                 print("normalized volume 5m:", data["historical_prices"]["5m"][last_key_5m]["normalized_volume"])
 
                 resp1, resp2 = await asyncio.gather(
@@ -1243,7 +1247,7 @@ class Strategy:
                             [
                                 #not abs(data["historical_prices"]["1m"][last_key_1m]["rsi"] - 70.) < 4.,
                                 not data["current_state"]["rsi-1m"] > (70 - 0.),
-                                data["historical_prices"]["1m"][last_key_1m]["normalized_volume"] <= 0.5,
+                                #data["historical_prices"]["1m"][last_key_1m]["normalized_volume"] <= 0.5,
                                 #abs(data["historical_prices"]["5m"][last_key_5m]["rsi"] - 70.) < 3.,
                                 data["current_state"]["rsi-5m"] > (70 - 4.),
                                 data["historical_prices"]["5m"][last_key_5m]["normalized_volume"] <= 0.5
@@ -1255,7 +1259,7 @@ class Strategy:
                             [
                                 #not abs(data["historical_prices"]["1m"][last_key_1m]["rsi"] - 30.) < 4.,
                                 not data["current_state"]["rsi-1m"] < (30 + 0.),
-                                data["historical_prices"]["1m"][last_key_1m]["normalized_volume"] <= 0.5,
+                                #data["historical_prices"]["1m"][last_key_1m]["normalized_volume"] <= 0.5,
                                 #abs(data["historical_prices"]["5m"][last_key_5m]["rsi"] - 30.) < 3.,
                                 data["current_state"]["rsi-5m"] < (30 + 4.),
                                 data["historical_prices"]["5m"][last_key_5m]["normalized_volume"] <= 0.5
@@ -1316,7 +1320,7 @@ class Strategy:
                     #stop_loss = StopLoss(max(data["historical_prices"]["1m"][last_key_1m]["o"], data["historical_prices"]["1m"][last_key_1m]["c"]) + 5.)
                     #take_profit = TakeProfit(data["historical_prices"]["1m"][last_key_1m]["c"] - 9.)
 
-                    trailing_stop = MyTrailingStop(data["historical_prices"]["1s"][last_key_1s]["c"] + 5.)
+                    trailing_stop = MyTrailingStop(data["historical_prices"]["1s"][last_key_1s]["p"] + 5.)
                     print(f'current stop is {trailing_stop.actual_stop()}')
 
                     print(self.wallet.orders)
@@ -1366,7 +1370,7 @@ class Strategy:
                     #stop_loss = StopLoss(min(data["historical_prices"]["1m"][last_key_1m]["o"], data["historical_prices"]["1m"][last_key_1m]["c"]) - 5.)
                     #take_profit = TakeProfit(data["historical_prices"]["1m"][last_key_1m]["c"] + 9.)
 
-                    trailing_stop = MyTrailingStop(data["historical_prices"]["1s"][last_key_1s]["c"] - 5.)
+                    trailing_stop = MyTrailingStop(data["historical_prices"]["1s"][last_key_1s]["p"] - 5.)
                     print(f'current stop is {trailing_stop.actual_stop()}')
 
                     print(self.wallet.orders)
@@ -1384,9 +1388,9 @@ class Strategy:
 
                 # Calculate PNL %
                 if self.wallet.orders[self.wallet.INDEX]["Side"] == Parameters.TYPE_LONG.value:
-                    profit_percent = 100 * (data["historical_prices"]["1s"][last_key_1s]["c"] - self.wallet.orders[self.wallet.INDEX]["Open"]) * float(Parameters.INDEX_POINT.value) / self.wallet.orders[self.wallet.INDEX]["Open"]
+                    profit_percent = 100 * (data["historical_prices"]["1s"][last_key_1s]["p"] - self.wallet.orders[self.wallet.INDEX]["Open"]) * float(Parameters.INDEX_POINT.value) / self.wallet.orders[self.wallet.INDEX]["Open"]
                 elif self.wallet.orders[self.wallet.INDEX]["Side"] == Parameters.TYPE_SHORT.value:
-                    profit_percent = 100 * (self.wallet.orders[self.wallet.INDEX]["Open"] - data["historical_prices"]["1s"][last_key_1s]["c"]) * float(Parameters.INDEX_POINT.value) / self.wallet.orders[self.wallet.INDEX]["Open"]
+                    profit_percent = 100 * (self.wallet.orders[self.wallet.INDEX]["Open"] - data["historical_prices"]["1s"][last_key_1s]["p"]) * float(Parameters.INDEX_POINT.value) / self.wallet.orders[self.wallet.INDEX]["Open"]
 
                 print("profit percent:", profit_percent)
 
@@ -1404,7 +1408,7 @@ class Strategy:
                                 
                                 break
                     print(f'current stop is {trailing_stop.actual_stop()} at {Data.to_datetime(data["current_date"])}')
-                    print("current price:", data["historical_prices"]["1s"][last_key_1s]["c"])
+                    print("current price:", data["historical_prices"]["1s"][last_key_1s]["p"])
                     print("current bar:", Data.to_datetime(data["historical_prices"]["1m"][last_key_1m]["t"]).strftime("%Y-%m-%d %H:%M:%S"))
                     
                     '''resp = await self.check_conditions(
@@ -1418,7 +1422,8 @@ class Strategy:
                     resp1 = await self.check_conditions(
                         cond=all(
                             [
-                                trailing_stop.check_trigger(data["historical_prices"]["1s"][last_key_1s]["c"], Parameters.TYPE_LONG.value)
+                                profit_percent<0 or profit_percent>2,
+                                trailing_stop.check_trigger(data["historical_prices"]["1s"][last_key_1s]["p"], Parameters.TYPE_LONG.value)
                             ]
                         )
                     )
@@ -1427,7 +1432,7 @@ class Strategy:
                         self.check_conditions(
                             cond=all(
                                 [
-                                    #take_profit.check_trigger(data["historical_prices"]["1s"][last_key_1s]["c"], Parameters.TYPE_LONG.value) or abs(data["current_state"]["rsi-1m"] - 70) < 5.
+                                    #take_profit.check_trigger(data["historical_prices"]["1s"][last_key_1s]["p"], Parameters.TYPE_LONG.value) or abs(data["current_state"]["rsi-1m"] - 70) < 5.
                                     profit_percent >= 9. # / 20.
                                 ]
                             )
@@ -1435,8 +1440,8 @@ class Strategy:
                         self.check_conditions(
                             cond=all(
                                 [
-                                    stop_loss.check_trigger(data["historical_prices"]["1s"][last_key_1s]["c"], Parameters.TYPE_LONG.value),
-                                    #data["historical_prices"]["1s"][last_key_1s]["c"] < self.wallet.orders[self.wallet.INDEX]['Open'] - 5.,
+                                    stop_loss.check_trigger(data["historical_prices"]["1s"][last_key_1s]["p"], Parameters.TYPE_LONG.value),
+                                    #data["historical_prices"]["1s"][last_key_1s]["p"] < self.wallet.orders[self.wallet.INDEX]['Open'] - 5.,
                                     #data["historical_prices"]["5m"][last_key_5m]["c"] <= min( data["historical_prices"]["5m"][key]["l"] for key in last_keys_5m )
                                 ]
                             )
@@ -1546,7 +1551,7 @@ class Strategy:
                                 
                                 break
                     print(f'current stop is {trailing_stop.actual_stop()} at {Data.to_datetime(data["current_date"])}')
-                    print("current price:", data["historical_prices"]["1s"][last_key_1s]["c"])
+                    print("current price:", data["historical_prices"]["1s"][last_key_1s]["p"])
                     print("current bar:", Data.to_datetime(data["historical_prices"]["1m"][last_key_1m]["t"]).strftime("%Y-%m-%d %H:%M:%S"))
                     
                     '''resp = await self.check_conditions(
@@ -1560,7 +1565,8 @@ class Strategy:
                     resp1 = await self.check_conditions(
                         cond=all(
                             [
-                                trailing_stop.check_trigger(data["historical_prices"]["1s"][last_key_1s]["c"], Parameters.TYPE_SHORT.value)
+                                profit_percent<0 or profit_percent>2,
+                                trailing_stop.check_trigger(data["historical_prices"]["1s"][last_key_1s]["p"], Parameters.TYPE_SHORT.value)
                             ]
                         )
                     )
@@ -1569,7 +1575,7 @@ class Strategy:
                         self.check_conditions(
                             cond=all(
                                 [
-                                    #take_profit.check_trigger(data["historical_prices"]["1s"][last_key_1s]["c"], Parameters.TYPE_SHORT.value) or abs(data["current_state"]["rsi-1m"] - 30) < 5.
+                                    #take_profit.check_trigger(data["historical_prices"]["1s"][last_key_1s]["p"], Parameters.TYPE_SHORT.value) or abs(data["current_state"]["rsi-1m"] - 30) < 5.
                                     profit_percent >= 9. # / 20.
                                 ]
                             )
@@ -1577,8 +1583,8 @@ class Strategy:
                         self.check_conditions(
                             cond=all(
                                 [
-                                    stop_loss.check_trigger(data["historical_prices"]["1s"][last_key_1s]["c"], Parameters.TYPE_SHORT.value),
-                                    #data["historical_prices"]["1s"][last_key_1s]["c"] > self.wallet.orders[self.wallet.INDEX]['Open'] + 5.,
+                                    stop_loss.check_trigger(data["historical_prices"]["1s"][last_key_1s]["p"], Parameters.TYPE_SHORT.value),
+                                    #data["historical_prices"]["1s"][last_key_1s]["p"] > self.wallet.orders[self.wallet.INDEX]['Open'] + 5.,
                                     #data["historical_prices"]["5m"][last_key_5m]["c"] >= max( data["historical_prices"]["5m"][key]["h"] for key in last_keys_5m )
                                 ]
                             )
@@ -1763,7 +1769,7 @@ class Strategy:
                         self.wallet.open_position(
                             side="SELL",
                             quantity=self.qty,
-                            price=data["historical_prices"]["1s"][last_key_1s]["c"],
+                            price=data["historical_prices"]["1s"][last_key_1s]["p"],
                             date=Data.to_datetime(data["historical_prices"]["1s"][last_key_1s]["t"]).strftime("%Y-%m-%d %H:%M:%S")
                             #type=Client.FUTURE_ORDER_TYPE_LIMIT
                         )
@@ -1774,7 +1780,7 @@ class Strategy:
                         self.wallet.open_position(
                             side="SELL",
                             quantity=self.qty,
-                            price=data["historical_prices"]["1s"][last_key_1s]["c"],
+                            price=data["historical_prices"]["1s"][last_key_1s]["p"],
                             date=Data.to_datetime(data["historical_prices"]["1s"][last_key_1s]["t"]).strftime("%Y-%m-%d %H:%M:%S"),
                             type=Client.FUTURE_ORDER_TYPE_LIMIT
                         )
@@ -1820,7 +1826,7 @@ class Strategy:
                         self.wallet.open_position(
                             side="BUY",
                             quantity=self.qty,
-                            price=data["historical_prices"]["1s"][last_key_1s]["c"],
+                            price=data["historical_prices"]["1s"][last_key_1s]["p"],
                             date=Data.to_datetime(data["historical_prices"]["1s"][last_key_1s]["t"]).strftime("%Y-%m-%d %H:%M:%S")
                             #type=Client.FUTURE_ORDER_TYPE_LIMIT
                         )
@@ -1831,7 +1837,7 @@ class Strategy:
                         self.wallet.open_position(
                             side="BUY",
                             quantity=self.qty,
-                            price=data["historical_prices"]["1s"][last_key_1s]["c"],
+                            price=data["historical_prices"]["1s"][last_key_1s]["p"],
                             date=Data.to_datetime(data["historical_prices"]["1s"][last_key_1s]["t"]).strftime("%Y-%m-%d %H:%M:%S"),
                             type=Client.FUTURE_ORDER_TYPE_LIMIT
                         )
@@ -1861,9 +1867,9 @@ class Strategy:
 
                 # Calculate PNL %
                 if self.wallet.orders[self.wallet.INDEX]["Side"] == Parameters.TYPE_LONG.value:
-                    profit_percent = 100 * (data["historical_prices"]["1s"][last_key_1s]["c"] - self.wallet.orders[self.wallet.INDEX]["Open"]) * float(Parameters.INDEX_POINT.value) / self.wallet.orders[self.wallet.INDEX]["Open"]
+                    profit_percent = 100 * (data["historical_prices"]["1s"][last_key_1s]["p"] - self.wallet.orders[self.wallet.INDEX]["Open"]) * float(Parameters.INDEX_POINT.value) / self.wallet.orders[self.wallet.INDEX]["Open"]
                 elif self.wallet.orders[self.wallet.INDEX]["Side"] == Parameters.TYPE_SHORT.value:
-                    profit_percent = 100 * (self.wallet.orders[self.wallet.INDEX]["Open"] - data["historical_prices"]["1s"][last_key_1s]["c"]) * float(Parameters.INDEX_POINT.value) / self.wallet.orders[self.wallet.INDEX]["Open"]
+                    profit_percent = 100 * (self.wallet.orders[self.wallet.INDEX]["Open"] - data["historical_prices"]["1s"][last_key_1s]["p"]) * float(Parameters.INDEX_POINT.value) / self.wallet.orders[self.wallet.INDEX]["Open"]
 
                 print("profit percent:", profit_percent)
 
@@ -1890,8 +1896,8 @@ class Strategy:
                         self.check_conditions(
                             cond=all(
                                 [
-                                    stop_loss.check_trigger(data["historical_prices"]["1s"][last_key_1s]["c"], Parameters.TYPE_LONG.value),
-                                    #data["historical_prices"]["1s"][last_key_1s]["c"] < self.wallet.orders[self.wallet.INDEX]['Open'] - 5.,
+                                    stop_loss.check_trigger(data["historical_prices"]["1s"][last_key_1s]["p"], Parameters.TYPE_LONG.value),
+                                    #data["historical_prices"]["1s"][last_key_1s]["p"] < self.wallet.orders[self.wallet.INDEX]['Open'] - 5.,
                                     #data["historical_prices"]["5m"][last_key_5m]["c"] <= min( data["historical_prices"]["5m"][key]["l"] for key in last_keys_5m )
                                 ]
                             )
@@ -1907,7 +1913,7 @@ class Strategy:
                             self.wallet.close_position(
                                 side="SELL",
                                 quantity=self.qty,
-                                price=data["historical_prices"]["1s"][last_key_1s]["c"],
+                                price=data["historical_prices"]["1s"][last_key_1s]["p"],
                                 date=Data.to_datetime(data["historical_prices"]["1s"][last_key_1s]["t"]).strftime("%Y-%m-%d %H:%M:%S")
                                 #type=Client.FUTURE_ORDER_TYPE_LIMIT
                             )
@@ -1917,7 +1923,7 @@ class Strategy:
                             self.wallet.close_position(
                                 side="SELL",
                                 quantity=self.qty,
-                                price=data["historical_prices"]["1s"][last_key_1s]["c"],
+                                price=data["historical_prices"]["1s"][last_key_1s]["p"],
                                 date=Data.to_datetime(data["historical_prices"]["1s"][last_key_1s]["t"]).strftime("%Y-%m-%d %H:%M:%S"),
                                 type=Client.FUTURE_ORDER_TYPE_LIMIT
                             )
@@ -1946,7 +1952,7 @@ class Strategy:
                             self.wallet.close_position(
                                 side="SELL",
                                 quantity=self.qty,
-                                price=data["historical_prices"]["1s"][last_key_1s]["c"],
+                                price=data["historical_prices"]["1s"][last_key_1s]["p"],
                                 date=Data.to_datetime(data["historical_prices"]["1s"][last_key_1s]["t"]).strftime("%Y-%m-%d %H:%M:%S")
                                 #type=Client.FUTURE_ORDER_TYPE_LIMIT
                             )
@@ -1956,7 +1962,7 @@ class Strategy:
                             self.wallet.close_position(
                                 side="SELL",
                                 quantity=self.qty,
-                                price=data["historical_prices"]["1s"][last_key_1s]["c"],
+                                price=data["historical_prices"]["1s"][last_key_1s]["p"],
                                 date=Data.to_datetime(data["historical_prices"]["1s"][last_key_1s]["t"]).strftime("%Y-%m-%d %H:%M:%S"),
                                 type=Client.FUTURE_ORDER_TYPE_LIMIT
                             )
@@ -2010,8 +2016,8 @@ class Strategy:
                         self.check_conditions(
                             cond=all(
                                 [
-                                    stop_loss.check_trigger(data["historical_prices"]["1s"][last_key_1s]["c"], Parameters.TYPE_SHORT.value),
-                                    #data["historical_prices"]["1s"][last_key_1s]["c"] > self.wallet.orders[self.wallet.INDEX]['Open'] + 5.,
+                                    stop_loss.check_trigger(data["historical_prices"]["1s"][last_key_1s]["p"], Parameters.TYPE_SHORT.value),
+                                    #data["historical_prices"]["1s"][last_key_1s]["p"] > self.wallet.orders[self.wallet.INDEX]['Open'] + 5.,
                                     #data["historical_prices"]["5m"][last_key_5m]["c"] >= max( data["historical_prices"]["5m"][key]["h"] for key in last_keys_5m )
                                 ]
                             )
@@ -2027,7 +2033,7 @@ class Strategy:
                             self.wallet.close_position(
                                 side="BUY",
                                 quantity=self.qty,
-                                price=data["historical_prices"]["1s"][last_key_1s]["c"],
+                                price=data["historical_prices"]["1s"][last_key_1s]["p"],
                                 date=Data.to_datetime(data["historical_prices"]["1s"][last_key_1s]["t"]).strftime("%Y-%m-%d %H:%M:%S")
                                 #type=Client.FUTURE_ORDER_TYPE_LIMIT
                             )
@@ -2037,7 +2043,7 @@ class Strategy:
                             self.wallet.close_position(
                                 side="BUY",
                                 quantity=self.qty,
-                                price=data["historical_prices"]["1s"][last_key_1s]["c"],
+                                price=data["historical_prices"]["1s"][last_key_1s]["p"],
                                 date=Data.to_datetime(data["historical_prices"]["1s"][last_key_1s]["t"]).strftime("%Y-%m-%d %H:%M:%S"),
                                 type=Client.FUTURE_ORDER_TYPE_LIMIT
                             )
@@ -2066,7 +2072,7 @@ class Strategy:
                             self.wallet.close_position(
                                 side="BUY",
                                 quantity=self.qty,
-                                price=data["historical_prices"]["1s"][last_key_1s]["c"],
+                                price=data["historical_prices"]["1s"][last_key_1s]["p"],
                                 date=Data.to_datetime(data["historical_prices"]["1s"][last_key_1s]["t"]).strftime("%Y-%m-%d %H:%M:%S")
                                 #type=Client.FUTURE_ORDER_TYPE_LIMIT
                             )
@@ -2076,7 +2082,7 @@ class Strategy:
                             self.wallet.close_position(
                                 side="BUY",
                                 quantity=self.qty,
-                                price=data["historical_prices"]["1s"][last_key_1s]["c"],
+                                price=data["historical_prices"]["1s"][last_key_1s]["p"],
                                 date=Data.to_datetime(data["historical_prices"]["1s"][last_key_1s]["t"]).strftime("%Y-%m-%d %H:%M:%S"),
                                 type=Client.FUTURE_ORDER_TYPE_LIMIT
                             )
@@ -2128,15 +2134,15 @@ class Strategy:
                 list(data["historical_prices"]["5m"].keys())[-i] for i in range(1,10)
             ]
 
-            print("current price:", data["historical_prices"]["1s"][last_key_1s]["c"])
+            print("current price:", data["historical_prices"]["1s"][last_key_1s]["p"])
 
             if not self.wallet.is_open():
                 #print("Waiting to open position")
                 print("Waiting to open position", Data.to_datetime(data["current_date"]))
                 print("RSI 1m:", data["historical_prices"]["1m"][last_key_1m]["rsi"])
-                print("RSI 5m:", data["historical_prices"]["5m"][last_key_5m]["rsi"])
+                #print("RSI 5m:", data["historical_prices"]["5m"][last_key_5m]["rsi"])
                 print("Norm. volume 1m:", data["historical_prices"]["1m"][last_key_1m]["normalized_volume"])
-                print("Norm. volume 1m:", data["historical_prices"]["5m"][last_key_5m]["normalized_volume"])
+                print("Norm. volume 5m:", data["historical_prices"]["5m"][last_key_5m]["normalized_volume"])
 
                 resp1, resp2 = await asyncio.gather(
                     self.check_conditions(
@@ -2144,10 +2150,10 @@ class Strategy:
                             [
                                 #not abs(data["historical_prices"]["1m"][last_key_1m]["rsi"] - 70.) < 4.,
                                 data["historical_prices"]["1m"][last_key_1m]["rsi"] > (70 - 4.),
-                                data["historical_prices"]["1m"][last_key_1m]["normalized_volume"] > 1.,
+                                data["historical_prices"]["1m"][last_key_1m]["normalized_volume"] > .5,
                                 #abs(data["historical_prices"]["5m"][last_key_5m]["rsi"] - 70.) < 3.,
-                                data["historical_prices"]["5m"][last_key_5m]["rsi"] > (70 - 6.),
-                                data["historical_prices"]["5m"][last_key_5m]["normalized_volume"] > 1.
+                                #data["historical_prices"]["5m"][last_key_5m]["rsi"] > (70 - 6.),
+                                #data["historical_prices"]["5m"][last_key_5m]["normalized_volume"] > .0
                             ]
                         )
                     ),
@@ -2156,10 +2162,10 @@ class Strategy:
                             [
                                 #not abs(data["historical_prices"]["1m"][last_key_1m]["rsi"] - 30.) < 4.,
                                 data["historical_prices"]["1m"][last_key_1m]["rsi"] < (30 + 4.),
-                                data["historical_prices"]["1m"][last_key_1m]["normalized_volume"] > 1.,
+                                data["historical_prices"]["1m"][last_key_1m]["normalized_volume"] > .5,
                                 #abs(data["historical_prices"]["5m"][last_key_5m]["rsi"] - 30.) < 3.,
-                                data["historical_prices"]["5m"][last_key_5m]["rsi"] < (30 + 6.),
-                                data["historical_prices"]["5m"][last_key_5m]["normalized_volume"] > 1.
+                                #data["historical_prices"]["5m"][last_key_5m]["rsi"] < (30 + 6.),
+                                #data["historical_prices"]["5m"][last_key_5m]["normalized_volume"] > .0
                             ]
                         )
                     )
@@ -2172,7 +2178,7 @@ class Strategy:
                     self.wallet.open_position(
                         side="BUY",
                         quantity=self.qty,
-                        price=data["historical_prices"]["1s"][last_key_1s]["c"],
+                        price=data["historical_prices"]["1s"][last_key_1s]["p"],
                         date=Data.to_datetime(data["historical_prices"]["1s"][last_key_1s]["t"]).strftime("%Y-%m-%d %H:%M:%S")
                     )
 
@@ -2187,7 +2193,7 @@ class Strategy:
 
                     #stop_loss = StopLoss(max(data["historical_prices"]["1m"][last_key_1m]["o"], data["historical_prices"]["1m"][last_key_1m]["c"]) - 2.)
                     #trailing_stop = MyTrailingStop(data["historical_prices"]["1m"][last_key_1m]["c"] - 5.)
-                    trailing_stop = MyTrailingStop(data["historical_prices"]["1s"][last_key_1s]["c"] - 5.)
+                    trailing_stop = MyTrailingStop(data["historical_prices"]["1s"][last_key_1s]["p"] - 5.)
                     print(f'current stop is {trailing_stop.actual_stop()}')
 
                     print(self.wallet.orders)
@@ -2204,7 +2210,7 @@ class Strategy:
                     self.wallet.open_position(
                         side="SELL",
                         quantity=self.qty,
-                        price=data["historical_prices"]["1s"][last_key_1s]["c"],
+                        price=data["historical_prices"]["1s"][last_key_1s]["p"],
                         date=Data.to_datetime(data["historical_prices"]["1s"][last_key_1s]["t"]).strftime("%Y-%m-%d %H:%M:%S")
                     )
 
@@ -2219,7 +2225,7 @@ class Strategy:
 
                     #stop_loss = StopLoss(max(data["historical_prices"]["1m"][last_key_1m]["o"], data["historical_prices"]["1m"][last_key_1m]["c"]) + 2.)
                     #trailing_stop = MyTrailingStop(data["historical_prices"]["1m"][last_key_1m]["c"] + 5.)
-                    trailing_stop = MyTrailingStop(data["historical_prices"]["1s"][last_key_1s]["c"] + 5.)
+                    trailing_stop = MyTrailingStop(data["historical_prices"]["1s"][last_key_1s]["p"] + 5.)
                     print(f'current stop is {trailing_stop.actual_stop()}')
 
                     print(self.wallet.orders)
@@ -2246,10 +2252,10 @@ class Strategy:
                                 
                                 break
                     print(f'current stop is {trailing_stop.actual_stop()} at {Data.to_datetime(data["current_date"])}')
-                    print("current price:", data["historical_prices"]["1s"][last_key_1s]["c"])
+                    print("current price:", data["historical_prices"]["1s"][last_key_1s]["p"])
                     print("current bar:", Data.to_datetime(data["historical_prices"]["1m"][last_key_1m]["t"]).strftime("%Y-%m-%d %H:%M:%S"))
 
-                    #trailing_stop.update_stop(data["historical_prices"]["1s"][last_key_1s]["c"], Parameters.TYPE_LONG.value)
+                    #trailing_stop.update_stop(data["historical_prices"]["1s"][last_key_1s]["p"], Parameters.TYPE_LONG.value)
                     #print("Current Stop:", trailing_stop.current_stop)
                     
                     '''resp = await self.check_conditions(
@@ -2263,7 +2269,7 @@ class Strategy:
                     resp1 = await self.check_conditions(
                         cond=all(
                             [
-                                trailing_stop.check_trigger(data["historical_prices"]["1s"][last_key_1s]["c"], Parameters.TYPE_LONG.value)
+                                trailing_stop.check_trigger(data["historical_prices"]["1s"][last_key_1s]["p"], Parameters.TYPE_LONG.value)
                             ]
                         )
                     )
@@ -2272,15 +2278,15 @@ class Strategy:
                         self.check_conditions(
                             cond=all(
                                 [
-                                    trailing_stop.check_trigger(data["historical_prices"]["1s"][last_key_1s]["c"], Parameters.TYPE_LONG.value)
+                                    trailing_stop.check_trigger(data["historical_prices"]["1s"][last_key_1s]["p"], Parameters.TYPE_LONG.value)
                                 ]
                             )
                         ),
                         self.check_conditions(
                             cond=all(
                                 [
-                                    #data["historical_prices"]["1s"][last_key_1s]["c"] < self.wallet.orders[self.wallet.INDEX]['Open'] - 5.,
-                                    stop_loss.check_trigger(data["historical_prices"]["1s"][last_key_1s]["c"], Parameters.TYPE_LONG.value)
+                                    #data["historical_prices"]["1s"][last_key_1s]["p"] < self.wallet.orders[self.wallet.INDEX]['Open'] - 5.,
+                                    stop_loss.check_trigger(data["historical_prices"]["1s"][last_key_1s]["p"], Parameters.TYPE_LONG.value)
                                 ]
                             )
                         )
@@ -2292,7 +2298,7 @@ class Strategy:
                         self.wallet.close_position(
                             side="SELL",
                             quantity=self.qty,
-                            price=data["historical_prices"]["1s"][last_key_1s]["c"],
+                            price=data["historical_prices"]["1s"][last_key_1s]["p"],
                             date=Data.to_datetime(data["historical_prices"]["1s"][last_key_1s]["t"]).strftime("%Y-%m-%d %H:%M:%S")
                         )
 
@@ -2318,7 +2324,7 @@ class Strategy:
                         self.wallet.close_position(
                             side="SELL",
                             quantity=self.qty,
-                            price=data["historical_prices"]["1s"][last_key_1s]["c"],
+                            price=data["historical_prices"]["1s"][last_key_1s]["p"],
                             date=Data.to_datetime(data["historical_prices"]["1s"][last_key_1s]["t"]).strftime("%Y-%m-%d %H:%M:%S")
                         )
 
@@ -2352,10 +2358,10 @@ class Strategy:
                                 
                                 break
                     print(f'current stop is {trailing_stop.actual_stop()} at {Data.to_datetime(data["current_date"])}')
-                    print("current price:", data["historical_prices"]["1s"][last_key_1s]["c"])
+                    print("current price:", data["historical_prices"]["1s"][last_key_1s]["p"])
                     print("current bar:", Data.to_datetime(data["historical_prices"]["1m"][last_key_1m]["t"]).strftime("%Y-%m-%d %H:%M:%S"))
 
-                    #trailing_stop.update_stop(data["historical_prices"]["1s"][last_key_1s]["c"], Parameters.TYPE_SHORT.value)
+                    #trailing_stop.update_stop(data["historical_prices"]["1s"][last_key_1s]["p"], Parameters.TYPE_SHORT.value)
                     #print("Current Stop:", trailing_stop.current_stop)
                     
                     '''resp = await self.check_conditions(
@@ -2369,7 +2375,7 @@ class Strategy:
                     resp1 = await self.check_conditions(
                         cond=all(
                             [
-                                trailing_stop.check_trigger(data["historical_prices"]["1s"][last_key_1s]["c"], Parameters.TYPE_SHORT.value)
+                                trailing_stop.check_trigger(data["historical_prices"]["1s"][last_key_1s]["p"], Parameters.TYPE_SHORT.value)
                             ]
                         )
                     )
@@ -2378,15 +2384,15 @@ class Strategy:
                         self.check_conditions(
                             cond=all(
                                 [
-                                    trailing_stop.check_trigger(data["historical_prices"]["1s"][last_key_1s]["c"], Parameters.TYPE_SHORT.value)
+                                    trailing_stop.check_trigger(data["historical_prices"]["1s"][last_key_1s]["p"], Parameters.TYPE_SHORT.value)
                                 ]
                             )
                         ),
                         self.check_conditions(
                             cond=all(
                                 [
-                                    #data["historical_prices"]["1s"][last_key_1s]["c"] > self.wallet.orders[self.wallet.INDEX]['Open'] + 5.,
-                                    stop_loss.check_trigger(data["historical_prices"]["1s"][last_key_1s]["c"], Parameters.TYPE_SHORT.value)
+                                    #data["historical_prices"]["1s"][last_key_1s]["p"] > self.wallet.orders[self.wallet.INDEX]['Open'] + 5.,
+                                    stop_loss.check_trigger(data["historical_prices"]["1s"][last_key_1s]["p"], Parameters.TYPE_SHORT.value)
                                 ]
                             )
                         )
@@ -2399,7 +2405,7 @@ class Strategy:
                         self.wallet.close_position(
                             side="BUY",
                             quantity=self.qty,
-                            price=data["historical_prices"]["1s"][last_key_1s]["c"],
+                            price=data["historical_prices"]["1s"][last_key_1s]["p"],
                             date=Data.to_datetime(data["historical_prices"]["1s"][last_key_1s]["t"]).strftime("%Y-%m-%d %H:%M:%S")
                         )
 
@@ -2425,7 +2431,7 @@ class Strategy:
                         self.wallet.close_position(
                             side="BUY",
                             quantity=self.qty,
-                            price=data["historical_prices"]["1s"][last_key_1s]["c"],
+                            price=data["historical_prices"]["1s"][last_key_1s]["p"],
                             date=Data.to_datetime(data["historical_prices"]["1s"][last_key_1s]["t"]).strftime("%Y-%m-%d %H:%M:%S")
                         )
 
@@ -2500,7 +2506,7 @@ class Strategy:
                     self.wallet.open_position(
                         side="BUY",
                         quantity=self.qty,
-                        price=data["historical_prices"]["1s"][last_key_1s]["c"],
+                        price=data["historical_prices"]["1s"][last_key_1s]["p"],
                         date=Data.to_datetime(data["historical_prices"]["1s"][last_key_1s]["t"]).strftime("%Y-%m-%d %H:%M:%S")
                     )
 
@@ -2521,7 +2527,7 @@ class Strategy:
                     self.wallet.open_position(
                         side="SELL",
                         quantity=self.qty,
-                        price=data["historical_prices"]["1s"][last_key_1s]["c"],
+                        price=data["historical_prices"]["1s"][last_key_1s]["p"],
                         date=Data.to_datetime(data["historical_prices"]["1s"][last_key_1s]["t"]).strftime("%Y-%m-%d %H:%M:%S")
                     )
 
@@ -2555,7 +2561,7 @@ class Strategy:
                         self.check_conditions(
                             cond=all(
                                 [
-                                    trailing_stop.check_trigger(data["historical_prices"]["1s"][last_key_1s]["c"], Parameters.TYPE_LONG.value)
+                                    trailing_stop.check_trigger(data["historical_prices"]["1s"][last_key_1s]["p"], Parameters.TYPE_LONG.value)
                                 ]
                             ),
                             t=60
@@ -2563,8 +2569,8 @@ class Strategy:
                         self.check_conditions(
                             cond=all(
                                 [
-                                    #data["historical_prices"]["1s"][last_key_1s]["c"] < self.wallet.orders[self.wallet.INDEX]['Open'] - 5.,
-                                    stop_loss.check_trigger(data["historical_prices"]["1s"][last_key_1s]["c"], Parameters.TYPE_LONG.value)
+                                    #data["historical_prices"]["1s"][last_key_1s]["p"] < self.wallet.orders[self.wallet.INDEX]['Open'] - 5.,
+                                    stop_loss.check_trigger(data["historical_prices"]["1s"][last_key_1s]["p"], Parameters.TYPE_LONG.value)
                                 ]
                             )
                         )
@@ -2576,7 +2582,7 @@ class Strategy:
                         self.wallet.close_position(
                             side="SELL",
                             quantity=self.qty,
-                            price=data["historical_prices"]["1s"][last_key_1s]["c"],
+                            price=data["historical_prices"]["1s"][last_key_1s]["p"],
                             date=Data.to_datetime(data["historical_prices"]["1s"][last_key_1s]["t"]).strftime("%Y-%m-%d %H:%M:%S")
                         )
                         print(self.wallet.orders)
@@ -2592,7 +2598,7 @@ class Strategy:
                         self.wallet.close_position(
                             side="SELL",
                             quantity=self.qty,
-                            price=data["historical_prices"]["1s"][last_key_1s]["c"],
+                            price=data["historical_prices"]["1s"][last_key_1s]["p"],
                             date=Data.to_datetime(data["historical_prices"]["1s"][last_key_1s]["t"]).strftime("%Y-%m-%d %H:%M:%S")
                         )
                         print(self.wallet.orders)
@@ -2619,15 +2625,15 @@ class Strategy:
                         self.check_conditions(
                             cond=all(
                                 [
-                                    trailing_stop.check_trigger(data["historical_prices"]["1s"][last_key_1s]["c"], Parameters.TYPE_SHORT.value)
+                                    trailing_stop.check_trigger(data["historical_prices"]["1s"][last_key_1s]["p"], Parameters.TYPE_SHORT.value)
                                 ]
                             )
                         ),
                         self.check_conditions(
                             cond=all(
                                 [
-                                    #data["historical_prices"]["1s"][last_key_1s]["c"] > self.wallet.orders[self.wallet.INDEX]['Open'] + 5.,
-                                    stop_loss.check_trigger(data["historical_prices"]["1s"][last_key_1s]["c"], Parameters.TYPE_SHORT.value)
+                                    #data["historical_prices"]["1s"][last_key_1s]["p"] > self.wallet.orders[self.wallet.INDEX]['Open'] + 5.,
+                                    stop_loss.check_trigger(data["historical_prices"]["1s"][last_key_1s]["p"], Parameters.TYPE_SHORT.value)
                                 ]
                             )
                         )
@@ -2640,7 +2646,7 @@ class Strategy:
                         self.wallet.close_position(
                             side="BUY",
                             quantity=self.qty,
-                            price=data["historical_prices"]["1s"][last_key_1s]["c"],
+                            price=data["historical_prices"]["1s"][last_key_1s]["p"],
                             date=Data.to_datetime(data["historical_prices"]["1s"][last_key_1s]["t"]).strftime("%Y-%m-%d %H:%M:%S")
                         )
                         print(self.wallet.orders)
@@ -2656,7 +2662,7 @@ class Strategy:
                         self.wallet.close_position(
                             side="BUY",
                             quantity=self.qty,
-                            price=data["historical_prices"]["1s"][last_key_1s]["c"],
+                            price=data["historical_prices"]["1s"][last_key_1s]["p"],
                             date=Data.to_datetime(data["historical_prices"]["1s"][last_key_1s]["t"]).strftime("%Y-%m-%d %H:%M:%S")
                         )
                         print(self.wallet.orders)

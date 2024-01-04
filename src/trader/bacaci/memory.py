@@ -95,8 +95,7 @@ class Memory:
                 rows = [
                     self.database.fetch_rows(
                         Data.table_name(self.SYMBOL, intervals[0], self.API),
-                        limit=6000
-                        #limit=1000
+                        limit=600
                     ),
                     self.database.fetch_rows(
                         Data.table_name(self.SYMBOL, intervals[1], self.API),
@@ -104,7 +103,7 @@ class Memory:
                     ),
                     self.database.fetch_rows(
                         Data.table_name(self.SYMBOL, intervals[2], self.API),
-                        limit=100
+                        limit=50
                     ),
                     self.database.fetch_rows(
                         Data.table_name(self.SYMBOL, intervals[3], self.API),
@@ -114,12 +113,25 @@ class Memory:
 
             dfs = [
                 pd.DataFrame(
+                    rows[0], columns=["timestamp","date","price"]
+                ),
+                pd.DataFrame(
                     # Data.generate_df(row)
-                    row, columns=["timestamp","date","open","high","low","close","volume"]
-                ) for row in rows
+                    rows[1], columns=["timestamp","date","open","high","low","close","volume"]
+                ),
+                pd.DataFrame(
+                    # Data.generate_df(row)
+                    rows[2], columns=["timestamp","date","open","high","low","close","volume"]
+                ),
+                pd.DataFrame(
+                    # Data.generate_df(row)
+                    rows[3], columns=["timestamp","date","open","high","low","close","volume"]
+                )
             ]
 
-            # each 10 sec:
+            # to reconsider:
+
+            '''# each 10 sec:
             #dfs[0] = dfs[0][ dfs[0]['timestamp'] % 10 == 0 ] # 10lu saniyelerin verileri
             #dfs[0] = dfs[0].loc[ dfs[0]['timestamp'] % 10 == (self.CURRENT_TIMESTAMP % 10) ] # son 10 saniyelerin verileri
 
@@ -156,60 +168,54 @@ class Memory:
                 #np.append(grouped_sums_5m, group_sum)
             
             grouped_sums_1m_array = np.array(grouped_sums_1m)
-            grouped_sums_5m_array = np.array([None] * 80 + grouped_sums_5m) # astuce
+            grouped_sums_5m_array = np.array([None] * 80 + grouped_sums_5m) # astuce'''
 
             # real-time(intrabar) RSI with pandas_ta:
             '''rsi = [
-                selected_df_10s.join(RSI(selected_df_10s['close'], length=14, sma=14)),
+                selected_df_10s.join(RSI(selected_df_10s['price'], length=14, sma=14)),
                 selected_df_back_1m.join(RSI(selected_df_back_1m['close'], length=14, sma=14)),
                 selected_df_back_5m.join(RSI(selected_df_back_5m['close'], length=14, sma=14))
             ]'''
 
-            temp_df1 = dfs[1]
-            temp_df1.loc[len(dfs[1].index)] = { 'close': selected_df_10s['close'].iloc[-1] }
-            temp_df2 = dfs[2]
-            temp_df2.loc[len(dfs[2].index)] = { 'close': selected_df_10s['close'].iloc[-1] }
-            temp_df3 = dfs[3]
-            temp_df3.loc[len(dfs[3].index)] = { 'close': selected_df_10s['close'].iloc[-1] }
+            temp_df0 = dfs[0].copy()
+            temp_df1 = dfs[1].copy()
+            temp_df1.loc[len(dfs[1].index)] = { 'close': dfs[0]['price'].iloc[-1] }
+            temp_df2 = dfs[2].copy()
+            temp_df2.loc[len(dfs[2].index)] = { 'close': dfs[0]['price'].iloc[-1] }
+            temp_df3 = dfs[3].copy()
+            temp_df3.loc[len(dfs[3].index)] = { 'close': dfs[0]['price'].iloc[-1] }
 
             # bar RSI with pandas_ta:
             rsi = [
-                selected_df_10s.join(RSI(selected_df_10s['close'], length=14, sma=14)),
-                dfs[1].join(RSI(temp_df1['close'], length=14, sma=14)),
-                dfs[2].join(RSI(temp_df2['close'], length=14, sma=14)),
-                dfs[3].join(RSI(temp_df3['close'], length=14, sma=14))
+                temp_df0.join(RSI(dfs[0]['price'], length=14, sma=14)),
+                temp_df1.join(RSI(temp_df1['close'], length=14, sma=14)),
+                temp_df2.join(RSI(temp_df2['close'], length=14, sma=14)),
+                temp_df3.join(RSI(temp_df3['close'], length=14, sma=14))
             ]
 
-            rsi = [
+            '''rsi = [
                 r.reset_index(drop=True) for r in rsi
-            ]
+            ]'''
 
             normalized_data = [
-                pd.DataFrame(Memory.normalize_data(rsi[0]["volume"].iloc[-9:].values), columns=['normalized_volume']),
-                pd.DataFrame(Memory.normalize_data(grouped_sums_1m_array), columns=['normalized_volume']),
-                pd.DataFrame(Memory.normalize_data(grouped_sums_5m_array), columns=['normalized_volume']),
-                #pd.DataFrame(Memory.normalize_data(rsi[1]["volume"].values[:-1]), columns=['normalized_volume']),
-                #pd.DataFrame(Memory.normalize_data(rsi[2]["volume"].values[:-1]), columns=['normalized_volume']),
-                pd.DataFrame()
+                pd.DataFrame(),
+                pd.DataFrame(Memory.normalize_data(rsi[1]["volume"].values[:-1]), columns=['normalized_volume']),
+                pd.DataFrame(Memory.normalize_data(rsi[2]["volume"].values[:-1]), columns=['normalized_volume']),
+                pd.DataFrame(Memory.normalize_data(rsi[3]["volume"].values[:-1]), columns=['normalized_volume'])
             ]
 
-            # NOTICE:
-            # print(Memory.normalize_data(grouped_sums_1m_array))
-
             scaled_data = [
-                Memory.scale_data(rsi[0]["volume"].iloc[:-1], name="volume"),
+                pd.DataFrame(),
                 Memory.scale_data(rsi[1]["volume"].iloc[:-1], name="volume"),
                 Memory.scale_data(rsi[2]["volume"].iloc[:-1], name="volume"),
                 Memory.scale_data(rsi[3]["volume"].iloc[:-1], name="volume")
             ]
 
             minmaxed_data = [
-                pd.DataFrame(Memory.minmax_data(rsi[0]["volume"].iloc[-9:].values), columns=['minmax_volume']),
-                #pd.DataFrame(Memory.minmax_data(grouped_sums_1m_array), columns=['minmax_volume']),
-                #pd.DataFrame(Memory.minmax_data(grouped_sums_5m_array), columns=['minmax_volume'])
-                pd.DataFrame(Memory.minmax_data(rsi[1]["volume"].iloc[-10:-1].values), columns=['minmax_volume']),
-                pd.DataFrame(Memory.minmax_data(rsi[2]["volume"].iloc[-10:-1].values), columns=['minmax_volume']),
-                pd.DataFrame()
+                pd.DataFrame(),
+                pd.DataFrame(Memory.minmax_data(rsi[1]["volume"].iloc[:-1].values), columns=['minmax_volume']),
+                pd.DataFrame(Memory.minmax_data(rsi[2]["volume"].iloc[:-1].values), columns=['minmax_volume']),
+                pd.DataFrame(Memory.minmax_data(rsi[3]["volume"].iloc[:-1].values), columns=['minmax_volume'])
             ]
 
             data = []
@@ -244,21 +250,9 @@ class Memory:
                 #if row[0] % 10 == 0: # remove if necessary
                 self.memory["historical_prices"]["1s"][int(row.iloc[0])] = {
                     "t": int(row.iloc[0]),
-                    "o": row.iloc[2],
-                    "h": row.iloc[3],
-                    "l": row.iloc[4],
-                    "c": row.iloc[5],
-                    "v": row.iloc[6],
-                    "rolling_v": None,
-                    "rsi": row.iloc[7],
-                    #"rsiUP": bool((normalized[0]['RSI_14'].iloc[i] - normalized[0]['RSI_14'].iloc[i-10]) > 0),
-                    #"rsiUP": Memory.isRSIup_draft(normalized[0], row[0], 10),
-                    "normalized_volume": row.iloc[8],
-                    "scaled_volume": row.iloc[9],
-                    "minmax_volume": row.iloc[10],
-                    "coef": abs(row.iloc[7] - 50) * row.iloc[8],
-                    "isMinLocal": None,
-                    "isMaxLocal": None
+                    "p": row.iloc[2],
+                    "rsi": row.iloc[3],
+                    "v": None # continuous kline where 'x': false
                 }
             print("fetched 1s data")
 

@@ -344,6 +344,8 @@ class Data:
             return 60
         elif interval == '5m':
             return 300
+        elif interval == '15m':
+            return 900
     
     @staticmethod
     def to_datetime(ts):
