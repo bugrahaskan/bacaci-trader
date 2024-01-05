@@ -294,7 +294,7 @@ class Wallet:
         return self.orders
     
     # perimated
-    def stop_loss(self, df, i, percentage):
+    '''def stop_loss(self, df, i, percentage):
         # abs() < eps ile yakınsama?
 
         if self.orders[self.INDEX]["Side"] == Parameters.TYPE_LONG.value:
@@ -310,10 +310,10 @@ class Wallet:
                 return False
         
         else:
-            return False
+            return False'''
         
     # perimated
-    def stop_loss_2(self, close, percentage):
+    '''def stop_loss_2(self, close, percentage):
 
         if self.orders[self.INDEX]["Side"] == Parameters.TYPE_LONG.value:
             if close < (100 - percentage) * 0.01 * self.orders[self.INDEX]['Open']:
@@ -328,10 +328,10 @@ class Wallet:
                 return False
 
         else:
-            return False
+            return False'''
     
     # perimated
-    def take_profit(self, df, i, percentage):
+    '''def take_profit(self, df, i, percentage):
         # abs() < eps ile yakınsama?
 
         if self.orders[self.INDEX]["Side"] == Parameters.TYPE_LONG.value:
@@ -347,20 +347,20 @@ class Wallet:
                 return False
         
         else:
-            return False
+            return False'''
 
     # perimated
-    def dummy_trailing_stop(self, df, i):
+    '''def dummy_trailing_stop(self, df, i):
         # to correct...
 
         if df["close"].iloc[i-1] - df["close"].iloc[i] > 1.:
             return True
         
         else:
-            return False
+            return False'''
     
     # perimated
-    def trailing_stop(self, df, i):
+    '''def trailing_stop(self, df, i):
         # to develop...
 
         if self.orders[self.INDEX]["Side"] == Parameters.TYPE_LONG.value:
@@ -376,7 +376,7 @@ class Wallet:
                 return False
         
         else:
-            return False
+            return False'''
 
 
 class TrailingStop:
