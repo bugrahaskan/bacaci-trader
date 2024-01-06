@@ -415,7 +415,7 @@ class Memory:
                     memory.write(json.dumps(self.memory))
                     print("Memory written to file")
 
-            await asyncio.sleep(10)
+            await asyncio.sleep(1)
 
     @staticmethod
     def isGreen(timestamp, table_name, database_name=Parameters.DATABASE.value):

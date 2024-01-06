@@ -53,7 +53,7 @@ class Strategy:
         loop.run_until_complete(
             asyncio.gather(
                 self.memory.mem(),
-                self.strategy_2_PROD()
+                self.strategy_1_PROD()
             )
         )
 
@@ -77,7 +77,7 @@ class Strategy:
         
         return data
 
-    async def check_conditions(self, cond, t=10):
+    async def check_conditions(self, cond, t=1):
         
         await asyncio.sleep(t)
 
@@ -86,7 +86,7 @@ class Strategy:
         else:
             return False
 
-    async def check_event(self, event: asyncio.Event, t=10):
+    async def check_event(self, event: asyncio.Event, t=1):
 
         while True:
 
@@ -98,7 +98,7 @@ class Strategy:
                 event.set()
                 break
 
-    async def check_event_is_order_filled(self, event: asyncio.Event, t=10):
+    async def check_event_is_order_filled(self, event: asyncio.Event, t=1):
 
         while True:
 
@@ -116,7 +116,7 @@ class Strategy:
                     event.set()
                     break
 
-    async def check_event_reset_conditions(self, event: asyncio.Event, interval="5m",  t=10):
+    async def check_event_reset_conditions(self, event: asyncio.Event, interval="5m",  t=1):
 
         while True:
 
@@ -134,7 +134,7 @@ class Strategy:
                     event.set()
                     break
     
-    async def check_event_rsi_change(self, event: asyncio.Event, direction, interval="15m", t=10):
+    async def check_event_rsi_change(self, event: asyncio.Event, direction, interval="15m", t=1):
 
         while True:
 
@@ -1371,6 +1371,14 @@ class Strategy:
                         date=Data.to_datetime(data["historical_prices"]["1s"][last_key_1s]["t"]).strftime("%Y-%m-%d %H:%M:%S")
                     )
 
+                    print(self.wallet.orders)
+                    print()
+                    print(self.wallet.binance.client.futures_get_order(
+                                                symbol=self.wallet.orders[self.wallet.INDEX]['Symbol'],
+                                                orderId=self.wallet.orders[self.wallet.INDEX]['IdOpen']
+                                                ))
+                    print()
+
                     await asyncio.gather(
                         event.wait(),
                         self.check_event_is_order_filled(
@@ -1385,7 +1393,7 @@ class Strategy:
                     trailing_stop = MyTrailingStop(data["historical_prices"]["1s"][last_key_1s]["p"] - 5.)
                     print(f'current stop is {trailing_stop.actual_stop()}')
 
-                    print(self.wallet.orders)
+                    #print(self.wallet.orders)
 
                     Notification("bhaskan@bacaciyatirim.com", json.dumps(self.wallet.orders[self.wallet.INDEX]))
                     #Notification("oozlen@bacaciyatirim.com", json.dumps(self.wallet.orders[self.wallet.INDEX]))
@@ -1403,6 +1411,14 @@ class Strategy:
                         date=Data.to_datetime(data["historical_prices"]["1s"][last_key_1s]["t"]).strftime("%Y-%m-%d %H:%M:%S")
                     )
 
+                    print(self.wallet.orders)
+                    print()
+                    print(self.wallet.binance.client.futures_get_order(
+                                                symbol=self.wallet.orders[self.wallet.INDEX]['Symbol'],
+                                                orderId=self.wallet.orders[self.wallet.INDEX]['IdOpen']
+                                                ))
+                    print()
+
                     await asyncio.gather(
                         event.wait(),
                         self.check_event_is_order_filled(
@@ -1417,7 +1433,7 @@ class Strategy:
                     trailing_stop = MyTrailingStop(data["historical_prices"]["1s"][last_key_1s]["p"] + 5.)
                     print(f'current stop is {trailing_stop.actual_stop()}')
 
-                    print(self.wallet.orders)
+                    #print(self.wallet.orders)
 
                     Notification("bhaskan@bacaciyatirim.com", json.dumps(self.wallet.orders[self.wallet.INDEX]))
                     #Notification("oozlen@bacaciyatirim.com", json.dumps(self.wallet.orders[self.wallet.INDEX]))
@@ -1491,6 +1507,14 @@ class Strategy:
                             date=Data.to_datetime(data["historical_prices"]["1s"][last_key_1s]["t"]).strftime("%Y-%m-%d %H:%M:%S")
                         )
 
+                        print(self.wallet.orders)
+                        print()
+                        print(self.wallet.binance.client.futures_get_order(
+                                                    symbol=self.wallet.orders[self.wallet.INDEX]['Symbol'],
+                                                    orderId=self.wallet.orders[self.wallet.INDEX]['IdOpen']
+                                                    ))
+                        print()
+
                         await asyncio.gather(
                             event.wait(),
                             self.check_event_is_order_filled(
@@ -1500,7 +1524,7 @@ class Strategy:
                         )
                         event.clear()
 
-                        print(self.wallet.orders)
+                        #print(self.wallet.orders)
 
                         Notification("bhaskan@bacaciyatirim.com", json.dumps(self.wallet.orders[self.wallet.INDEX]))
                         #Notification("oozlen@bacaciyatirim.com", json.dumps(self.wallet.orders[self.wallet.INDEX]))
@@ -1598,6 +1622,14 @@ class Strategy:
                             date=Data.to_datetime(data["historical_prices"]["1s"][last_key_1s]["t"]).strftime("%Y-%m-%d %H:%M:%S")
                         )
 
+                        print(self.wallet.orders)
+                        print()
+                        print(self.wallet.binance.client.futures_get_order(
+                                                    symbol=self.wallet.orders[self.wallet.INDEX]['Symbol'],
+                                                    orderId=self.wallet.orders[self.wallet.INDEX]['IdOpen']
+                                                    ))
+                        print()
+
                         await asyncio.gather(
                             event.wait(),
                             self.check_event_is_order_filled(
@@ -1607,7 +1639,7 @@ class Strategy:
                         )
                         event.clear()
 
-                        print(self.wallet.orders)
+                        #print(self.wallet.orders)
 
                         Notification("bhaskan@bacaciyatirim.com", json.dumps(self.wallet.orders[self.wallet.INDEX]))
                         #Notification("oozlen@bacaciyatirim.com", json.dumps(self.wallet.orders[self.wallet.INDEX]))
