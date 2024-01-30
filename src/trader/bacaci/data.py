@@ -286,6 +286,7 @@ class Data:
                     resp = json.loads(resp)
                     df = Data.generate_df_ws(resp, tick=True)
                     database.insert_data(df, tableName, tick=True)
+                    # create DataObject
                     print(resp["p"])
                     #await asyncio.sleep(0.1)
         

@@ -31,3 +31,7 @@ class TradeThread(threading.Thread):
 
     def run(self):
             self.strategy = Strategy(api=self.API, symbol=self.SYMBOL, test_mode=self.TEST_MODE) # which strategy
+            
+            # backtest
+            if self.TEST_MODE:
+                pass

@@ -1,7 +1,5 @@
 import configparser
 from enum import Enum
-#from datetime import datetime
-#import datetime as dt
 from binance import Client
 
 class Parameters(Enum):

@@ -417,6 +417,12 @@ class Memory:
 
             await asyncio.sleep(1)
 
+    async def mem_for_backtest(self):
+
+        __gen = self.generate_data("1m", 1704632640, 1704643260)
+
+        pass
+
     @staticmethod
     def isGreen(timestamp, table_name, database_name=Parameters.DATABASE.value):
         database = Database(database_name)

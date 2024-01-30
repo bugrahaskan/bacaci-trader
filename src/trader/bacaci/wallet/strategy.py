@@ -49,13 +49,24 @@ class Strategy:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
 
-        #loop.run_until_complete(self.dummy_strategy(cond=True))
-        loop.run_until_complete(
-            asyncio.gather(
-                self.memory.mem(),
-                self.strategy_1_PROD()
+        if self.TEST_MODE:
+            loop.run_until_complete(
+                asyncio.gather(
+                    self.memory.mem_for_backtest(),
+                    self.strategy_2_PROD()
+                )
             )
-        )
+
+            pass
+        else:
+            #loop.run_until_complete(self.dummy_strategy(cond=True))
+            loop.run_until_complete(
+                asyncio.gather(
+                    self.memory.mem(),
+                    self.strategy_2_PROD()
+                )
+            )
+
 
     def write_to_excel(self):
         '''
@@ -496,6 +507,8 @@ class Strategy:
                         ),
                         t=1
                     )'''
+
+                    print(self.wallet.orders)
                 
                     await asyncio.gather(
                         event.wait(),
@@ -512,7 +525,7 @@ class Strategy:
                     trailing_stop = MyTrailingStop(data["historical_prices"]["1s"][last_key_1s]["p"] + 5.)
                     print(f'current stop is {trailing_stop.actual_stop()}')
 
-                    print(self.wallet.orders)
+                    #print(self.wallet.orders)
 
                     Notification("bhaskan@bacaciyatirim.com", json.dumps(self.wallet.orders[self.wallet.INDEX]))
                     #Notification("oozlen@bacaciyatirim.com", json.dumps(self.wallet.orders[self.wallet.INDEX]))
@@ -546,7 +559,9 @@ class Strategy:
                             date=Data.to_datetime(data["historical_prices"]["1m"][last_key_1m]["t"]).strftime("%Y-%m-%d %H:%M:%S"),
                             type=Client.FUTURE_ORDER_TYPE_LIMIT
                         )
-                
+                    
+                    print(self.wallet.orders)
+                    
                     await asyncio.gather(
                         event.wait(),
                         self.check_event_is_order_filled(
@@ -562,7 +577,7 @@ class Strategy:
                     trailing_stop = MyTrailingStop(data["historical_prices"]["1s"][last_key_1s]["p"] - 5.)
                     print(f'current stop is {trailing_stop.actual_stop()}')
 
-                    print(self.wallet.orders)
+                    #print(self.wallet.orders)
 
                     Notification("bhaskan@bacaciyatirim.com", json.dumps(self.wallet.orders[self.wallet.INDEX]))
                     #Notification("oozlen@bacaciyatirim.com", json.dumps(self.wallet.orders[self.wallet.INDEX]))
@@ -611,7 +626,7 @@ class Strategy:
                     resp1 = await self.check_conditions(
                         cond=all(
                             [
-                                profit_percent<0 or profit_percent>2,
+                                profit_percent<0 or profit_percent>0.5,
                                 trailing_stop.check_trigger(data["historical_prices"]["1s"][last_key_1s]["p"], Parameters.TYPE_LONG.value)
                             ]
                         )
@@ -661,6 +676,8 @@ class Strategy:
                                 type=Client.FUTURE_ORDER_TYPE_LIMIT
                             )
 
+                        print(self.wallet.orders)
+                        
                         await asyncio.gather(
                             event.wait(),
                             self.check_event_is_order_filled(
@@ -670,12 +687,25 @@ class Strategy:
                         )
                         event.clear()
                         
-                        print(self.wallet.orders)
+                        #print(self.wallet.orders)
 
                         Notification("bhaskan@bacaciyatirim.com", json.dumps(self.wallet.orders[self.wallet.INDEX]))
                         #Notification("oozlen@bacaciyatirim.com", json.dumps(self.wallet.orders[self.wallet.INDEX]))
 
                         self.write_to_excel()
+
+                        # for security reasons:
+                        if profit_percent<0:
+
+                            await asyncio.gather(
+                                event.wait(),
+                                self.check_event_reset_conditions(
+                                    event=event,
+                                    interval="5m",
+                                    t=1
+                                )
+                            )
+                            event.clear()
                     
                     '''elif resp2:
                         print("Stop Loss")
@@ -754,7 +784,7 @@ class Strategy:
                     resp1 = await self.check_conditions(
                         cond=all(
                             [
-                                profit_percent<0 or profit_percent>2,
+                                profit_percent<0 or profit_percent>0.5,
                                 trailing_stop.check_trigger(data["historical_prices"]["1s"][last_key_1s]["p"], Parameters.TYPE_SHORT.value)
                             ]
                         )
@@ -804,6 +834,8 @@ class Strategy:
                                 type=Client.FUTURE_ORDER_TYPE_LIMIT
                             )
 
+                        print(self.wallet.orders)
+                        
                         await asyncio.gather(
                             event.wait(),
                             self.check_event_is_order_filled(
@@ -813,12 +845,25 @@ class Strategy:
                         )
                         event.clear()
 
-                        print(self.wallet.orders)
+                        #print(self.wallet.orders)
 
                         Notification("bhaskan@bacaciyatirim.com", json.dumps(self.wallet.orders[self.wallet.INDEX]))
                         #Notification("oozlen@bacaciyatirim.com", json.dumps(self.wallet.orders[self.wallet.INDEX]))
 
                         self.write_to_excel()
+
+                        # for security reasons:
+                        if profit_percent<0:
+
+                            await asyncio.gather(
+                                event.wait(),
+                                self.check_event_reset_conditions(
+                                    event=event,
+                                    interval="5m",
+                                    t=1
+                                )
+                            )
+                            event.clear()
 
                     '''elif resp2:
                         print("Stop Loss")
@@ -1372,13 +1417,7 @@ class Strategy:
                     )
 
                     print(self.wallet.orders)
-                    print()
-                    print(self.wallet.binance.client.futures_get_order(
-                                                symbol=self.wallet.orders[self.wallet.INDEX]['Symbol'],
-                                                orderId=self.wallet.orders[self.wallet.INDEX]['IdOpen']
-                                                ))
-                    print()
-
+                    
                     await asyncio.gather(
                         event.wait(),
                         self.check_event_is_order_filled(
@@ -1412,13 +1451,7 @@ class Strategy:
                     )
 
                     print(self.wallet.orders)
-                    print()
-                    print(self.wallet.binance.client.futures_get_order(
-                                                symbol=self.wallet.orders[self.wallet.INDEX]['Symbol'],
-                                                orderId=self.wallet.orders[self.wallet.INDEX]['IdOpen']
-                                                ))
-                    print()
-
+                    
                     await asyncio.gather(
                         event.wait(),
                         self.check_event_is_order_filled(
@@ -1508,13 +1541,7 @@ class Strategy:
                         )
 
                         print(self.wallet.orders)
-                        print()
-                        print(self.wallet.binance.client.futures_get_order(
-                                                    symbol=self.wallet.orders[self.wallet.INDEX]['Symbol'],
-                                                    orderId=self.wallet.orders[self.wallet.INDEX]['IdOpen']
-                                                    ))
-                        print()
-
+                        
                         await asyncio.gather(
                             event.wait(),
                             self.check_event_is_order_filled(
@@ -1623,13 +1650,7 @@ class Strategy:
                         )
 
                         print(self.wallet.orders)
-                        print()
-                        print(self.wallet.binance.client.futures_get_order(
-                                                    symbol=self.wallet.orders[self.wallet.INDEX]['Symbol'],
-                                                    orderId=self.wallet.orders[self.wallet.INDEX]['IdOpen']
-                                                    ))
-                        print()
-
+                        
                         await asyncio.gather(
                             event.wait(),
                             self.check_event_is_order_filled(
